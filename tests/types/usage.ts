@@ -1,4 +1,4 @@
-// Type-level tests: compiled with the host TypeScript by test/types.test.js.
+// Type-level tests: compiled with the host TypeScript by tests/types.test.js.
 // Every @ts-expect-error line must be an error; everything else must compile.
 import { createCss, css, defineTokens } from '@avonao/purser';
 import type { ColorToken, Token } from '@avonao/purser';

@@ -7,7 +7,7 @@ const ts = tryRequire('typescript');
 const skip = ts ? false : 'typescript is not installed in the host project';
 
 test('type declarations accept valid styles and reject raw colours, shorthands and typos', { skip }, () => {
-  const program = ts.createProgram([path.join(ROOT, 'test/types/usage.ts')], {
+  const program = ts.createProgram([path.join(ROOT, 'tests/types/usage.ts')], {
     strict: true,
     noEmit: true,
     target: ts.ScriptTarget.ES2022,

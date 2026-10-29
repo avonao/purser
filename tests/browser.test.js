@@ -14,7 +14,7 @@ import { hasChrome, launchChrome } from './helpers/cdp.js';
 import { ROOT, tryRequire } from './helpers/host.js';
 
 const skip = !hasChrome() ? 'Chrome not found' : !tryRequire('typescript') ? 'typescript is not installed in the host project' : false;
-const page = path.join(ROOT, 'test/fixtures/page');
+const page = path.join(ROOT, 'tests/fixtures/page');
 const strikeScript = fs.readFileSync(path.join(ROOT, 'scripts/strike-count.js'), 'utf8');
 let chrome;
 let dir;
@@ -131,7 +131,7 @@ test('lab() conversion agrees with Chrome for many inputs', { skip }, async () =
     const theirs = { l: +m[1], a: +m[2], b: +m[3], alpha: m[4] === undefined ? 1 : +m[4] };
     // Chrome's relative-colour path computes in float32 (it reports a = 0.0188 for #fff,
     // where the exact value is 0), so agreement is checked to 0.025; the exact
-    // reference vector from the spec is asserted in test/color.test.js.
+    // reference vector from the spec is asserted in tests/color.test.js.
     for (const k of ['l', 'a', 'b', 'alpha']) assert.ok(Math.abs(ours[k] - theirs[k]) < 0.025, `${input} ${k}: ours ${ours[k]} vs Chrome ${theirs[k]}`);
   }
 });

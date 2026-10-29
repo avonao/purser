@@ -21,24 +21,24 @@ const run = async (args) => {
 test('purser build writes the stylesheet and reports unchanged on a rerun', { skip }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'purser-cli-'));
   const out = path.join(dir, 'purser.css');
-  const args = ['build', '--project', 'test/fixtures/app', '--src', 'app,components,lib', '--tokens', 'lib/tokens.ts', '--out', out];
+  const args = ['build', '--project', 'tests/fixtures/app', '--src', 'app,components,lib', '--tokens', 'lib/tokens.ts', '--out', out];
   const first = await run(args);
   assert.equal(first.code, 0, first.stderr);
   assert.match(first.stdout, /wrote .*purser\.css \(4 files, \d+ classes/);
-  assert.equal(fs.readFileSync(out, 'utf8'), fs.readFileSync(path.join(ROOT, 'test/fixtures/app/expected.css'), 'utf8'));
+  assert.equal(fs.readFileSync(out, 'utf8'), fs.readFileSync(path.join(ROOT, 'tests/fixtures/app/expected.css'), 'utf8'));
   const second = await run(args);
   assert.match(second.stdout, /unchanged/);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('purser check passes on a clean project', { skip }, async () => {
-  const r = await run(['check', '--project', 'test/fixtures/app', '--src', 'app,components,lib', '--tokens', 'lib/tokens.ts']);
+  const r = await run(['check', '--project', 'tests/fixtures/app', '--src', 'app,components,lib', '--tokens', 'lib/tokens.ts']);
   assert.equal(r.code, 0, r.stderr);
   assert.match(r.stdout, /purser: ok/);
 });
 
 test('purser check exits 1 and lists every violation with file:line', { skip }, async () => {
-  const r = await run(['check', '--project', 'test/fixtures/bad', '--src', 'components', '--tokens', 'tokens.js']);
+  const r = await run(['check', '--project', 'tests/fixtures/bad', '--src', 'components', '--tokens', 'tokens.js']);
   assert.equal(r.code, 1);
   const lines = r.stderr.trim().split('\n');
   const at = (re) => lines.find((l) => re.test(l));
@@ -62,7 +62,7 @@ test('usage errors exit 2; --help and --version exit 0', async () => {
 });
 
 test('purser build --watch rebuilds when a source file changes', { skip }, async () => {
-  const dir = fs.mkdtempSync(path.join(ROOT, 'test/fixtures/.watch-'));
+  const dir = fs.mkdtempSync(path.join(ROOT, 'tests/fixtures/.watch-'));
   try {
     fs.writeFileSync(path.join(dir, 'a.js'), "import { css } from '@avonao/purser';\nexport const s = css.create({ a: { opacity: 1 } });\n");
     const { watch } = await import('../src/build/index.js');
@@ -82,7 +82,7 @@ test('purser build --watch rebuilds when a source file changes', { skip }, async
 });
 
 test('a custom css from createCss is extracted via --css-module with matching naming', { skip }, async () => {
-  const dir = fs.mkdtempSync(path.join(ROOT, 'test/fixtures/.custom-'));
+  const dir = fs.mkdtempSync(path.join(ROOT, 'tests/fixtures/.custom-'));
   try {
     fs.mkdirSync(path.join(dir, 'lib'));
     fs.writeFileSync(path.join(dir, 'lib/css.js'), "import { createCss } from '@avonao/purser';\nexport const css = createCss({ prefix: 'p' });\n");
@@ -100,7 +100,7 @@ test('a custom css from createCss is extracted via --css-module with matching na
 test('purser build --layers names the layers in the written stylesheet', { skip }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'purser-cli-'));
   const out = path.join(dir, 'purser.css');
-  const r = await run(['build', '--project', 'test/fixtures/app', '--src', 'app,components,lib', '--tokens', 'lib/tokens.ts', '--out', out, '--layers', 'p-tokens,p-globals,p-atoms']);
+  const r = await run(['build', '--project', 'tests/fixtures/app', '--src', 'app,components,lib', '--tokens', 'lib/tokens.ts', '--out', out, '--layers', 'p-tokens,p-globals,p-atoms']);
   assert.equal(r.code, 0, r.stderr);
   const text = fs.readFileSync(out, 'utf8');
   assert.ok(text.includes('\n@layer p-tokens, p-globals, p-atoms;\n'));
