@@ -79,6 +79,34 @@ import './purser.css';
 
 Import no other stylesheet that styles the same elements. Purser guarantees no overrides only within its own stylesheet.
 
+## Adopting Purser next to existing CSS
+
+A project that already has stylesheets can move to Purser one component at a time. While old and new CSS meet, two things must hold:
+
+- No old rule overrides an element that has moved. Purser's atoms therefore sit above every existing layer.
+- Purser's global rules do not override old rules on elements that have not moved yet. Globals therefore sit below the existing CSS.
+
+Give Purser's layers top-level names and declare the order once, at the top of the first stylesheet the page loads. A `@layer` statement may come before `@import`, so it can also go above a framework's import:
+
+```css
+/* app/globals.css */
+@layer purser-tokens, purser-globals;
+@import "tailwindcss";
+@layer legacy, purser-atoms;
+
+@layer legacy {
+  /* every rule that has not moved yet */
+}
+```
+
+```json
+"css": "purser build --project . --src app,components,lib --tokens lib/tokens.ts --out app/purser.css --layers purser-tokens,purser-globals,purser-atoms"
+```
+
+Wrap the existing unlayered rules in the `legacy` layer, because unlayered rules beat every layer, Purser's included. Token names must not clash with custom properties that the old stylesheets declare.
+
+To move a component, write its styles with `css.create` and delete the old rules that reached its elements. Then confirm that nothing else changed: `scripts/strike-count.js` lists every declaration that is still overridden on the page. Once the last old rule is gone, remove the `legacy` layer. You can then return to the default layer names.
+
 ## Server and client components
 
 `css.create`, `css.props` and the tokens object are pure functions with no React dependency. They work in server components, client components and route handlers. Class names are computed by the same code at build time, during server rendering and in the browser, so they always agree.

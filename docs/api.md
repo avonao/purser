@@ -128,6 +128,7 @@ interface BuildOptions {
   salt?: string;        // default ""
   packageName?: string; // default "@avonao/purser"
   cssModule?: string;   // module exporting a custom css = createCss({ … })
+  layers?: { tokens?: string; globals?: string; atoms?: string }; // cascade layer names
 }
 
 interface BuildResult {
@@ -147,7 +148,10 @@ The build scans `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.mts`, `.cts` and `.cjs` 
 purser build --project <dir> --src <dirs> --tokens <file> --out <file> [--watch]
 purser check --project <dir> --src <dirs> --tokens <file>
   [--prefix <name>] [--salt <text>] [--package <name>] [--css-module <file>]
+  [--layers <tokens>,<globals>,<atoms>]
 ```
+
+`--layers` (and the `layers` build option) names the three cascade layers. The defaults are `purser.tokens`, `purser.globals` and `purser.atoms`, which are sublayers of one `purser` layer and therefore sit together in the cascade. Give them top-level names when Purser joins an existing stylesheet; see [Adopting Purser next to existing CSS](nextjs.md#adopting-purser-next-to-existing-css).
 
 Exit codes: `0` for success, `1` for rule violations or errors (each printed as `file:line:column: error: message`), and `2` for usage errors.
 

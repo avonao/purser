@@ -16,3 +16,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Globals made exclusive with each other and with atom classes.
 - Build: static extraction with the host's TypeScript; `purser build` (with `--watch`) and `purser check`; JS API in `@avonao/purser/build`; output self-check with the host's PostCSS.
 - `scripts/strike-count.js`, an in-page counter of overridden declarations, and a headless Chrome integration test.
+- Configurable cascade layer names (`layers` build option, `--layers`), so that a project adopting Purser next to existing CSS can place globals below its old rules and atoms above them.

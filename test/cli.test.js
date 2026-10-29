@@ -96,3 +96,27 @@ test('a custom css from createCss is extracted via --css-module with matching na
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('purser build --layers names the layers in the written stylesheet', { skip }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'purser-cli-'));
+  const out = path.join(dir, 'purser.css');
+  const r = await run(['build', '--project', 'test/fixtures/app', '--src', 'app,components,lib', '--tokens', 'lib/tokens.ts', '--out', out, '--layers', 'p-tokens,p-globals,p-atoms']);
+  assert.equal(r.code, 0, r.stderr);
+  const text = fs.readFileSync(out, 'utf8');
+  assert.ok(text.includes('\n@layer p-tokens, p-globals, p-atoms;\n'));
+  assert.match(text, /\n@layer p-atoms \{\n/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('purser --layers rejects anything but three valid, different names (exit 2)', async () => {
+  const base = ['check', '--src', 'components'];
+  const two = await run([...base, '--layers', 'a,b']);
+  assert.equal(two.code, 2);
+  assert.match(two.stderr, /--layers takes three comma-separated names/);
+  const bad = await run([...base, '--layers', 'a,b c,d']);
+  assert.equal(bad.code, 2);
+  assert.match(bad.stderr, /--layers: layer name "b c" is not a CSS layer name/);
+  const same = await run([...base, '--layers', 'a,a,b']);
+  assert.equal(same.code, 2);
+  assert.match(same.stderr, /three different names/);
+});
