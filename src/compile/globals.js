@@ -160,16 +160,34 @@ export function compileGlobals(calls, coverage) {
 }
 
 const TYPE_SELECTOR = /^[a-zA-Z][\w-]*$/;
+const LEADING_TYPE = /^([a-zA-Z][\w-]*)(?=$|[.#:[])/;
+
+/** The type selector of a selector's last compound (`.card h1` → `h1`), or null when that compound has none. */
+function subjectType(sel) {
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < sel.length; i++) {
+    const c = sel[i];
+    if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth--;
+    else if (depth === 0 && (c === ' ' || c === '>' || c === '+' || c === '~')) start = i + 1;
+  }
+  const m = LEADING_TYPE.exec(sel.slice(start));
+  return m ? m[1].toLowerCase() : null;
+}
 
 /**
  * An element has exactly one tag name, so for a type-selector subject (h1)
  * another type selector (h2) is always false: `:not(h2)` is redundant and
- * `:is(h2)` makes the rule dead.
+ * `:is(h2)` makes the rule dead. The same holds for the last compounds of
+ * complex selectors: `.card h1` never matches what `.card button` matches.
  * @returns {boolean | null} true/false when decided by tag names, null otherwise
  */
 function decidedByTag(subject, other) {
-  if (!TYPE_SELECTOR.test(subject) || !TYPE_SELECTOR.test(other)) return null;
-  return subject.toLowerCase() === other.toLowerCase();
+  if (TYPE_SELECTOR.test(subject) && TYPE_SELECTOR.test(other)) return subject.toLowerCase() === other.toLowerCase();
+  const a = subjectType(subject);
+  const b = subjectType(other);
+  return a && b && a !== b ? false : null;
 }
 
 /** Render one global rule: subject + other literals + class exclusions + pseudo-element. Null when dead. */
