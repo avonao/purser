@@ -1,0 +1,71 @@
+{
+  "name": "@avonao/purser",
+  "version": "0.1.0",
+  "description": "Purser CSS: compile-time atomic CSS where overrides, !important and raw colours are impossible.",
+  "license": "MIT",
+  "author": "Avonao",
+  "homepage": "https://pursercss.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avonao/purser.git"
+  },
+  "bugs": "https://github.com/avonao/purser/issues",
+  "type": "module",
+  "keywords": [
+    "css",
+    "atomic-css",
+    "css-in-js",
+    "design-tokens",
+    "zero-runtime",
+    "react",
+    "nextjs"
+  ],
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./build": {
+      "types": "./types/build.d.ts",
+      "default": "./src/build/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./types/index.d.ts",
+  "bin": {
+    "purser": "./bin/purser.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "types",
+    "scripts/strike-count.js",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\"",
+    "test:update": "UPDATE_GOLDEN=1 node --test --test-concurrency=1 \"test/**/*.test.js\""
+  },
+  "peerDependencies": {
+    "postcss": ">=8.4",
+    "typescript": ">=5.0"
+  },
+  "peerDependenciesMeta": {
+    "postcss": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "postcss": "^8.5.6",
+    "typescript": "^5.9.3"
+  }
+}
