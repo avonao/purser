@@ -1,0 +1,14 @@
+# Dependencies (a local symlink to a host project's node_modules is common in development)
+node_modules
+package-lock.json
+
+# Test scratch directories
+test/fixtures/.watch-*
+test/fixtures/.custom-*
+coverage/
+
+# OS and editor files
+.DS_Store
+*.log
+.idea/
+.vscode/
