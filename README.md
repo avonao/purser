@@ -17,7 +17,7 @@ Purser CSS (Purser for short) lets you write styles next to your components in T
 3. **Every colour is a token.** A raw colour in a component style is a type error *and* a build error.
 4. **Every colour in the output is `lab()`.** Hex, `rgb()`, `hsl()`, `hwb()`, `oklch()`, `oklab()`, `lch()`, `color()` and named colours are converted exactly (CSS Color 4 math, D50).
 5. **Each declaration is written once.** Identical definitions share a class, output is deterministic, and class names are short stable hashes.
-6. **One generated stylesheet**, in three cascade layers: `purser.tokens`, `purser.globals`, `purser.atoms`.
+6. **One generated stylesheet**, in three cascade layers: `purser.tokens`, `purser.globals`, `purser.atoms` (renamable with `--layers`, to sit among an existing project's layers).
 
 See [docs/how-it-works.md](docs/how-it-works.md) for how each rule is enforced.
 
