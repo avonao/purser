@@ -49,8 +49,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\"",
-    "test:update": "UPDATE_GOLDEN=1 node --test --test-concurrency=1 \"test/**/*.test.js\""
+    "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\"",
+    "test:update": "UPDATE_GOLDEN=1 node --test --test-concurrency=1 \"tests/**/*.test.js\""
   },
   "peerDependencies": {
     "postcss": ">=8.4",

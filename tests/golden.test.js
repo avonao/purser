@@ -6,7 +6,7 @@ import { build } from '../src/build/index.js';
 import { ROOT, tryRequire } from './helpers/host.js';
 
 const skip = tryRequire('typescript') ? false : 'typescript is not installed in the host project';
-const app = path.join(ROOT, 'test/fixtures/app');
+const app = path.join(ROOT, 'tests/fixtures/app');
 const golden = path.join(app, 'expected.css');
 const options = { projectDir: app, src: ['app', 'components', 'lib'], tokens: 'lib/tokens.ts' };
 
@@ -38,7 +38,7 @@ test('the output obeys the rules it promises', { skip }, async () => {
 });
 
 test('runtime class names equal build class names (the page fixture)', { skip }, async () => {
-  const page = path.join(ROOT, 'test/fixtures/page');
+  const page = path.join(ROOT, 'tests/fixtures/page');
   const result = await build({ projectDir: page, src: ['.'], tokens: 'tokens.js' });
   assert.deepEqual(result.diagnostics, []);
   const { renderBody } = await import(path.join(page, 'page.js'));
