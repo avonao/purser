@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { compileStylesheet } from '../compile/stylesheet.js';
+import { compileStylesheet, resolveLayers } from '../compile/stylesheet.js';
 import { resolveNaming } from '../hash.js';
 import { extractFile } from './extract.js';
 import { findSourceFiles, isSourceFile } from './files.js';
@@ -20,6 +20,7 @@ import { selfCheck } from './selfcheck.js';
  * @property {string} [salt]              hash salt (default ""); must match createCss({ salt })
  * @property {string} [packageName]       runtime import specifier (default "@avonao/purser")
  * @property {string} [cssModule]         module exporting a custom `css = createCss({ … })`, relative to projectDir
+ * @property {{ tokens?: string, globals?: string, atoms?: string }} [layers]  cascade layer names (default purser.tokens, purser.globals, purser.atoms)
  */
 
 /**
@@ -42,6 +43,7 @@ export function createBuilder(options) {
   const outFile = options.out ? path.resolve(projectDir, options.out) : null;
   const cssModuleReal = options.cssModule ? real(path.resolve(projectDir, options.cssModule)) : null;
   const naming = resolveNaming({ prefix: options.prefix, salt: options.salt });
+  const layers = resolveLayers(options.layers);
   const ts = loadTypeScript(projectDir);
   const postcss = loadPostcss(projectDir);
   const tsOptions = compilerOptions(ts, projectDir);
@@ -111,6 +113,7 @@ export function createBuilder(options) {
       calls,
       prefix: options.prefix,
       salt: options.salt,
+      layers,
     });
     diagnostics.push(...compiled.diagnostics);
     const stats = { files: files.length, ...compiled.stats };

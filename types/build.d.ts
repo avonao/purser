@@ -17,6 +17,11 @@ export interface BuildOptions {
   packageName?: string;
   /** Module exporting a custom `css = createCss({ prefix, salt })`, relative to projectDir. */
   cssModule?: string;
+  /**
+   * Names of the three cascade layers (default `purser.tokens`, `purser.globals`, `purser.atoms`). Name them when
+   * Purser joins existing CSS, so that the host can order its own layers between them.
+   */
+  layers?: { tokens?: string; globals?: string; atoms?: string };
 }
 
 export interface Diagnostic {

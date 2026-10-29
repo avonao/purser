@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { build, check, watch } from './build/index.js';
+import { resolveLayers } from './compile/stylesheet.js';
 
 const HELP = `Usage:
   purser build --project <dir> --src <dirs> --tokens <file> --out <file> [--watch]
@@ -19,6 +20,8 @@ Options:
   --salt <text>      hash salt (default ""); must match createCss({ salt })
   --package <name>   runtime import specifier (default "@avonao/purser")
   --css-module <f>   module exporting a custom css = createCss({ prefix, salt })
+  --layers <t,g,a>   names of the tokens, globals and atoms cascade layers
+                     (default purser.tokens,purser.globals,purser.atoms)
   -h, --help         show this help
   -v, --version      show the version
 
@@ -50,6 +53,7 @@ export async function main(argv, io = {}) {
         salt: { type: 'string' },
         package: { type: 'string' },
         'css-module': { type: 'string' },
+        layers: { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
         version: { type: 'boolean', short: 'v', default: false },
       },
@@ -81,6 +85,20 @@ export async function main(argv, io = {}) {
     err('purser: build needs --out <file> (use "purser check" to only validate)\n');
     return 2;
   }
+  let layers;
+  if (v.layers !== undefined) {
+    const names = v.layers.split(',').map((s) => s.trim());
+    if (names.length !== 3) {
+      err('purser: --layers takes three comma-separated names: tokens,globals,atoms\n');
+      return 2;
+    }
+    try {
+      layers = resolveLayers({ tokens: names[0], globals: names[1], atoms: names[2] });
+    } catch (e) {
+      err(`purser: --layers: ${e.message}\n`);
+      return 2;
+    }
+  }
   const options = {
     projectDir: path.resolve(cwd, v.project),
     src: v.src.split(',').map((s) => s.trim()).filter(Boolean),
@@ -90,6 +108,7 @@ export async function main(argv, io = {}) {
     salt: v.salt,
     packageName: v.package,
     cssModule: v['css-module'],
+    layers,
   };
 
   const print = (result) => {

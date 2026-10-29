@@ -113,6 +113,8 @@ That leaves about 7.8·10¹⁰ possible names. The build fails if two different 
 @layer purser.atoms   { unconditional rules; at-rule groups; @keyframes }
 ```
 
+The three layer names can be changed with the `layers` build option or `--layers`. A stylesheet that declares a layer order before Purser's does decides where the three sit among its own layers ([adopting Purser next to existing CSS](nextjs.md#adopting-purser-next-to-existing-css)). Globals and atoms are exclusive by construction, so their relative order never decides a value.
+
 Order is deterministic: atoms sort by property, pseudo-element and class, and at-rule groups sort by prelude. Because rules for one property never overlap, the order does not affect which declaration wins. When `postcss` is available, the build parses the output and checks it again for `!important`, colours that are not `lab()`, and repeated declarations.
 
 ## 8. Shorthand policy
