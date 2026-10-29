@@ -82,3 +82,24 @@ test('globals obey the same value rules', () => {
   });
   assert.match(r3.diagnostics[0].message, /must not redeclare token --color-a/);
 });
+
+test('globals skip exclusions that the subject tag already rules out', () => {
+  const { css: out } = compileStylesheet({
+    calls: [{ kind: 'globals', value: { 'h1, button': { fontSize: 'inherit' }, '.site button': { fontSize: '13px' }, '.site h1': { fontSize: '2em' } } }],
+  });
+  const g = layerBody(out, 'purser.globals');
+  assert.match(g, /\n {2}h1:not\(\.site h1\) \{ font-size: inherit; \}/);
+  assert.match(g, /\n {2}button:not\(\.site button\) \{ font-size: inherit; \}/);
+  assert.match(g, /\n {2}\.site button \{ font-size: 13px; \}/);
+  assert.match(g, /\n {2}\.site h1 \{ font-size: 2em; \}/);
+});
+
+test('globals keep exclusions that tag names cannot decide', () => {
+  const { css: out } = compileStylesheet({
+    calls: [{ kind: 'globals', value: { '.a h1': { color: 'inherit' }, '.b h1': { color: 'currentcolor' }, a: { display: 'inline' }, 'svg|a': { display: 'block' } } }],
+  });
+  const g = layerBody(out, 'purser.globals');
+  assert.match(g, /\n {2}\.a h1:not\(\.b h1\) \{ color: inherit; \}/);
+  // svg|a is an `a` in the SVG namespace, not an svg element: the exclusion stays.
+  assert.match(g, /\n {2}a:not\(svg\|a\) \{ display: inline; \}/);
+});
