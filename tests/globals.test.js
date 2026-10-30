@@ -19,7 +19,18 @@ test('globals exclude elements that carry an atom class for the same property', 
   });
   const g = layerBody(out, 'purser.globals');
   assert.match(g, new RegExp(`\\*:not\\(\\.${cls}\\) \\{ margin-top: 0; \\}`));
-  assert.match(g, /\* \{ margin-left: 0; \}/);
+  assert.match(g, /\n {2}\* \{\n {4}margin-bottom: 0;\n {4}margin-left: 0;\n {4}margin-right: 0;\n {2}\}/);
+});
+
+test('globals with the same selector are one rule, declarations sorted', () => {
+  const { css: out } = compileStylesheet({
+    calls: [{ kind: 'globals', value: { 'h1, h2': { fontWeight: 'inherit', fontSize: 'inherit' }, h1: { color: 'inherit' } } }],
+  });
+  const g = layerBody(out, 'purser.globals');
+  assert.match(g, /\n {2}h1 \{\n {4}color: inherit;\n {4}font-size: inherit;\n {4}font-weight: inherit;\n {2}\}/);
+  assert.match(g, /\n {2}h2 \{\n {4}font-size: inherit;\n {4}font-weight: inherit;\n {2}\}/);
+  const selectors = [...g.matchAll(/^ {2}(\S[^{]*?) \{/gm)].map((m) => m[1]);
+  assert.equal(new Set(selectors).size, selectors.length);
 });
 
 test('logical atoms exclude their physical twins in globals', () => {
