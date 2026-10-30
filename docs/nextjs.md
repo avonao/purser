@@ -105,7 +105,17 @@ Give Purser's layers top-level names and declare the order once, at the top of t
 
 Wrap the existing unlayered rules in the `legacy` layer, because unlayered rules beat every layer, Purser's included. Token names must not clash with custom properties that the old stylesheets declare.
 
-To move a component, write its styles with `css.create` and delete the old rules that reached its elements. Then confirm that nothing else changed: `scripts/strike-count.js` lists every declaration that is still overridden on the page. Once the last old rule is gone, remove the `legacy` layer. You can then return to the default layer names.
+Some page-wide rules have to win over the old CSS: a high-contrast or reduced-motion mode that the old stylesheets forced with `!important` is the usual case. Write those with `css.globals(rules, { layer: 'overrides' })` and give the overrides layer a name between the old CSS and the atoms. They give way on moved elements like any global, so a moved component that sets the property itself is never overridden:
+
+```css
+@layer legacy, purser-overrides, purser-atoms;
+```
+
+```json
+"css": "purser build … --layers purser-tokens,purser-globals,purser-overrides,purser-atoms"
+```
+
+To move a component, write its styles with `css.create` and delete the old rules that reached its elements. Then confirm that nothing else changed: `scripts/strike-count.js` lists every declaration that is still overridden on the page. Once the last old rule is gone, remove the `legacy` layer and the `layer` option of the overrides, which are then ordinary globals. You can then return to the default layer names.
 
 ## Server and client components
 

@@ -18,10 +18,11 @@ export interface BuildOptions {
   /** Module exporting a custom `css = createCss({ prefix, salt })`, relative to projectDir. */
   cssModule?: string;
   /**
-   * Names of the three cascade layers (default `purser.tokens`, `purser.globals`, `purser.atoms`). Name them when
-   * Purser joins existing CSS, so that the host can order its own layers between them.
+   * Names of the cascade layers (default `purser.tokens`, `purser.globals`, `purser.overrides`, `purser.atoms`). Name
+   * them when Purser joins existing CSS, so that the host can order its own layers between them. The overrides layer
+   * is written only when a `css.globals(rules, { layer: 'overrides' })` call exists.
    */
-  layers?: { tokens?: string; globals?: string; atoms?: string };
+  layers?: { tokens?: string; globals?: string; overrides?: string; atoms?: string };
 }
 
 export interface Diagnostic {

@@ -81,7 +81,7 @@ export function compileGlobals(calls, coverage) {
         try {
           parsed = parseGlobalSelector(part, path);
           for (const e of normalizeStyle(value, path, { pseudoElements: !parsed.pe }).values()) {
-            items.push({ subject: parsed.subject, pe: parsed.pe || e.pe, prop: e.prop, tree: e.tree, path: e.path, call });
+            items.push({ subject: parsed.subject, pe: parsed.pe || e.pe, prop: e.prop, tree: e.tree, path: e.path, call, layer: call.layer ?? 'globals' });
           }
         } catch (err) {
           throw withCall(err, call);
@@ -170,7 +170,7 @@ function mergeSameSelector(rules) {
   const bySelector = new Map();
   const out = [];
   for (const r of rules) {
-    const key = [...r.atRules, r.selectors.join(',')].join('\u0000');
+    const key = [r.layer, ...r.atRules, r.selectors.join(',')].join('\u0000');
     const seen = bySelector.get(key);
     if (seen) seen.decls.push(...r.decls);
     else {
@@ -238,7 +238,7 @@ function renderGlobal(item, term, value) {
     } else suffix += l.neg ? `:not(${l.text})` : l.text;
   }
   if (excluded.length) suffix += `:not(${excluded.join(', ')})`;
-  return { atRules, selectors: [`${item.subject}${suffix}${item.pe}`], decls: [[item.prop, value]] };
+  return { atRules, selectors: [`${item.subject}${suffix}${item.pe}`], decls: [[item.prop, value]], layer: item.layer };
 }
 
 /** Self-check: globals plus every atom class for the property are exclusive. */

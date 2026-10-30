@@ -292,14 +292,18 @@ export function extractFile(file, text, ctx) {
       const kind = node.expression.name.text;
       if (KINDS.has(kind)) {
         const at = pos(node);
-        if (node.arguments.length !== 1) {
-          diagnostics.push({ severity: 'error', message: `css.${kind} takes exactly one argument`, file, ...at });
+        const max = kind === 'globals' ? 2 : 1;
+        if (node.arguments.length < 1 || node.arguments.length > max) {
+          const takes = max === 2 ? 'one argument and an optional options object' : 'exactly one argument';
+          diagnostics.push({ severity: 'error', message: `css.${kind} takes ${takes}`, file, ...at });
         } else {
           const arg = node.arguments[0];
           recovered = [];
           try {
             const value = ev(arg);
-            calls.push({ kind, value, file, ...at, locate: (path) => locate(value, arg, path) });
+            const call = { kind, value, file, ...at, locate: (path) => locate(value, arg, path) };
+            if (node.arguments.length === 2) call.options = ev(node.arguments[1]);
+            calls.push(call);
           } catch (err) {
             if (!(err instanceof StaticError)) throw err;
             recovered.push(err);

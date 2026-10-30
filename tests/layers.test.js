@@ -35,6 +35,42 @@ test('layer names are validated', () => {
   assert.throws(() => resolveLayers({ atoms: 'two words' }), /is not a CSS layer name/);
   assert.throws(() => resolveLayers({ atoms: '1st' }), /is not a CSS layer name/);
   assert.throws(() => resolveLayers({ atoms: 'a..b' }), /is not a CSS layer name/);
-  assert.throws(() => resolveLayers({ atoms: 'purser.globals' }), /three different names/);
+  assert.throws(() => resolveLayers({ atoms: 'purser.globals' }), /four different names/);
+  assert.throws(() => resolveLayers({ overrides: 'purser.atoms' }), /four different names/);
   assert.throws(() => resolveLayers({ utilities: 'u' }), /unknown layer "utilities"/);
+});
+
+const overrideCalls = [
+  { kind: 'globals', value: { '*': { borderTopLeftRadius: '4px' } } },
+  { kind: 'globals', value: { '.hc *': { borderTopLeftRadius: 0 } }, options: { layer: 'overrides' } },
+  { kind: 'create', value: { a: { borderTopLeftRadius: '2px' } } },
+];
+
+test('overrides globals get their own layer between globals and atoms', () => {
+  const { css: out, diagnostics } = compileStylesheet({ calls: overrideCalls });
+  assert.deepEqual(diagnostics, []);
+  assert.ok(out.includes('\n@layer purser.tokens, purser.globals, purser.overrides, purser.atoms;\n'));
+  const atom = css.create({ a: { borderTopLeftRadius: '2px' } }).a['border-top-left-radius'];
+  // Exclusive with the plain globals and with atoms, as if both calls were one.
+  assert.ok(out.includes(`\n@layer purser.globals {\n  *:not(.hc *):not(.${atom}) { border-top-left-radius: 4px; }\n}\n`));
+  assert.ok(out.includes(`\n@layer purser.overrides {\n  .hc *:not(.${atom}) { border-top-left-radius: 0; }\n}\n`));
+});
+
+test('the overrides layer is left out when no global asks for it', () => {
+  const { css: out } = compileStylesheet({ calls, layers: { overrides: 'late' } });
+  assert.ok(!out.includes('late'));
+});
+
+test('css.globals options are checked', () => {
+  const bad = (options) => compileStylesheet({ calls: [{ kind: 'globals', value: { body: { margin: 0 } }, options }] }).diagnostics;
+  assert.match(bad({ layer: 'atoms' })[0].message, /layer must be "globals" or "overrides"/);
+  assert.match(bad({ order: 1 })[0].message, /unknown css.globals option "order"/);
+  assert.match(bad('overrides')[0].message, /options must be an object/);
+  assert.deepEqual(bad({ layer: 'globals' }), []);
+});
+
+test('an override wins over a plain global wherever both match, whichever comes first', () => {
+  const { css: out } = compileStylesheet({ calls: [overrideCalls[1], overrideCalls[0]] });
+  assert.ok(out.includes('  *:not(.hc *) { border-top-left-radius: 4px; }\n'));
+  assert.ok(out.includes('  .hc * { border-top-left-radius: 0; }\n'));
 });

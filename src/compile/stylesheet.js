@@ -10,27 +10,35 @@ import { compileGlobals } from './globals.js';
 import { layer, renderRules } from './render.js';
 import { compileTokens } from './tokens.js';
 
-/** Default names of the three cascade layers, lowest first. */
-export const DEFAULT_LAYERS = Object.freeze({ tokens: 'purser.tokens', globals: 'purser.globals', atoms: 'purser.atoms' });
+/**
+ * Default names of the cascade layers, lowest first. The overrides layer holds globals declared with
+ * `{ layer: 'overrides' }` and is written only when there are some.
+ */
+export const DEFAULT_LAYERS = Object.freeze({
+  tokens: 'purser.tokens',
+  globals: 'purser.globals',
+  overrides: 'purser.overrides',
+  atoms: 'purser.atoms',
+});
 
 const LAYER_NAME = /^-?[A-Za-z_][\w-]*(?:\.-?[A-Za-z_][\w-]*)*$/;
 
 /**
  * Resolve the cascade layer names. A host that adopts Purser next to existing CSS names the layers so that it can
- * order them around its own: for example globals below the existing rules and atoms above them.
- * @param {{ tokens?: string, globals?: string, atoms?: string }} [layers]
- * @returns {{ tokens: string, globals: string, atoms: string }}
+ * order them around its own: for example globals below the existing rules, and overrides and atoms above them.
+ * @param {{ tokens?: string, globals?: string, overrides?: string, atoms?: string }} [layers]
+ * @returns {{ tokens: string, globals: string, overrides: string, atoms: string }}
  */
 export function resolveLayers(layers = {}) {
   const out = { ...DEFAULT_LAYERS };
   for (const key of Object.keys(layers)) {
-    if (!(key in DEFAULT_LAYERS)) throw new PurserError(`unknown layer "${key}" (expected tokens, globals or atoms)`);
+    if (!(key in DEFAULT_LAYERS)) throw new PurserError(`unknown layer "${key}" (expected tokens, globals, overrides or atoms)`);
     const name = layers[key];
     if (name === undefined) continue;
     if (typeof name !== 'string' || !LAYER_NAME.test(name)) throw new PurserError(`layer name ${JSON.stringify(name)} is not a CSS layer name`);
     out[key] = name;
   }
-  if (new Set(Object.values(out)).size !== 3) throw new PurserError('the tokens, globals and atoms layers need three different names');
+  if (new Set(Object.values(out)).size !== 4) throw new PurserError('the tokens, globals, overrides and atoms layers need four different names');
   return out;
 }
 
@@ -55,7 +63,7 @@ export function resolveLayers(layers = {}) {
 
 /**
  * Compile token definitions and extracted calls into CSS.
- * @param {{ tokens?: { axes?: object, tokens: object } | null, tokensFile?: string, calls: Call[], prefix?: string, salt?: string, layers?: { tokens?: string, globals?: string, atoms?: string } }} input
+ * @param {{ tokens?: { axes?: object, tokens: object } | null, tokensFile?: string, calls: Call[], prefix?: string, salt?: string, layers?: { tokens?: string, globals?: string, overrides?: string, atoms?: string } }} input
  * @returns {{ css: string | null, diagnostics: Diagnostic[], stats: { atoms: number, rules: number, keyframes: number, tokens: number } }}
  */
 export function compileStylesheet(input) {
@@ -145,7 +153,14 @@ export function compileStylesheet(input) {
   }
 
   // Globals (after atoms: they exclude atom classes).
-  const globalCalls = input.calls.filter((c) => c.kind === 'globals').map((c) => ({ def: c.value, origin: c, ...c }));
+  const globalCalls = [];
+  for (const c of input.calls.filter((c) => c.kind === 'globals')) {
+    const layerName = globalsLayer(c.options);
+    if (layerName instanceof PurserError) report(layerName, c);
+    else globalCalls.push({ def: c.value, origin: c, ...c, layer: layerName });
+  }
+  // A later global wins where two match, so overrides go after every plain global: where both match, the override wins.
+  globalCalls.sort((a, b) => (a.layer === b.layer ? 0 : a.layer === 'overrides' ? 1 : -1));
   let globals = { rules: [], fontFaces: [], items: [] };
   try {
     globals = compileGlobals(globalCalls, atomResult.coverage);
@@ -210,16 +225,34 @@ export function compileStylesheet(input) {
   for (const face of globals.fontFaces) {
     globalsCss += `  @font-face {\n${face.map(([p, v]) => `    ${p}: ${v};\n`).join('')}  }\n`;
   }
-  globalsCss += renderRules(globals.rules, '  ');
+  globalsCss += renderRules(globals.rules.filter((r) => r.layer === 'globals'), '  ');
+  const overridesCss = renderRules(globals.rules.filter((r) => r.layer === 'overrides'), '  ');
 
   const blocks = [
     layer(names.tokens, renderRules(tokens.rules, '  ')),
     layer(names.globals, globalsCss),
+    layer(names.overrides, overridesCss),
     layer(names.atoms, renderRules(atomResult.rules, '  ') + keyframesCss),
   ].filter(Boolean);
-  const statement = `@layer ${names.tokens}, ${names.globals}, ${names.atoms};`;
+  const order = overridesCss ? [names.tokens, names.globals, names.overrides, names.atoms] : [names.tokens, names.globals, names.atoms];
+  const statement = `@layer ${order.join(', ')};`;
   const css = `/* Generated by purser. Do not edit. */\n${statement}\n${blocks.map((b) => `\n${b}`).join('')}`;
   return { css, diagnostics, stats };
+}
+
+/**
+ * The layer a css.globals call writes to: 'globals' (the default) or 'overrides'.
+ * @returns {'globals' | 'overrides' | PurserError}
+ */
+function globalsLayer(options) {
+  if (options === undefined) return 'globals';
+  if (!options || typeof options !== 'object' || Array.isArray(options)) return new PurserError('css.globals options must be an object');
+  for (const key of Object.keys(options)) {
+    if (key !== 'layer') return new PurserError(`unknown css.globals option "${key}" (expected layer)`);
+  }
+  const l = options.layer ?? 'globals';
+  if (l !== 'globals' && l !== 'overrides') return new PurserError(`css.globals layer must be "globals" or "overrides", not ${JSON.stringify(l)}`);
+  return l;
 }
 
 function findCallByPath(err, atoms, atomCall) {

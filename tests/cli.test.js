@@ -108,15 +108,15 @@ test('purser build --layers names the layers in the written stylesheet', { skip 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('purser --layers rejects anything but three valid, different names (exit 2)', async () => {
+test('purser --layers rejects anything but three or four valid, different names (exit 2)', async () => {
   const base = ['check', '--src', 'components'];
   const two = await run([...base, '--layers', 'a,b']);
   assert.equal(two.code, 2);
-  assert.match(two.stderr, /--layers takes three comma-separated names/);
+  assert.match(two.stderr, /--layers takes three or four comma-separated names/);
   const bad = await run([...base, '--layers', 'a,b c,d']);
   assert.equal(bad.code, 2);
   assert.match(bad.stderr, /--layers: layer name "b c" is not a CSS layer name/);
   const same = await run([...base, '--layers', 'a,a,b']);
   assert.equal(same.code, 2);
-  assert.match(same.stderr, /three different names/);
+  assert.match(same.stderr, /four different names/);
 });
