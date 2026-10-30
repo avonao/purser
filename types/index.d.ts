@@ -169,6 +169,11 @@ export interface GlobalRules {
   readonly [selector: string]: StyleObject | FontFaceRule | readonly FontFaceRule[] | undefined;
 }
 
+export interface GlobalsOptions {
+  /** The cascade layer: `'globals'` (default) or `'overrides'`. */
+  readonly layer?: 'globals' | 'overrides';
+}
+
 export interface Css {
   /** Define named styles. Values must be static (literals, tokens, consts). */
   create<K extends string>(styles: Readonly<Record<K, StyleObject>>): { readonly [P in K]: CompiledStyle };
@@ -176,8 +181,11 @@ export interface Css {
   props(...styles: StyleArg[]): string;
   /** Define keyframes; returns the generated animation name. */
   keyframes(frames: Keyframes): string;
-  /** Define global rules. Compiled by the build; does nothing at runtime. */
-  globals(rules: GlobalRules): void;
+  /**
+   * Define global rules. Compiled by the build; does nothing at runtime. `{ layer: 'overrides' }` writes them to the
+   * overrides layer, which a host places above its existing CSS while it moves to Purser.
+   */
+  globals(rules: GlobalRules, options?: GlobalsOptions): void;
 }
 
 /** Naming options; the build must be given the same values. */

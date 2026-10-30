@@ -21,7 +21,8 @@ Options:
   --package <name>   runtime import specifier (default "@avonao/purser")
   --css-module <f>   module exporting a custom css = createCss({ prefix, salt })
   --layers <t,g,a>   names of the tokens, globals and atoms cascade layers
-                     (default purser.tokens,purser.globals,purser.atoms)
+                     (default purser.tokens,purser.globals,purser.atoms);
+                     four names t,g,o,a also name the overrides layer
   -h, --help         show this help
   -v, --version      show the version
 
@@ -88,12 +89,13 @@ export async function main(argv, io = {}) {
   let layers;
   if (v.layers !== undefined) {
     const names = v.layers.split(',').map((s) => s.trim());
-    if (names.length !== 3) {
-      err('purser: --layers takes three comma-separated names: tokens,globals,atoms\n');
+    if (names.length !== 3 && names.length !== 4) {
+      err('purser: --layers takes three or four comma-separated names: tokens,globals[,overrides],atoms\n');
       return 2;
     }
     try {
-      layers = resolveLayers({ tokens: names[0], globals: names[1], atoms: names[2] });
+      const [tokens, globals, ...rest] = names;
+      layers = resolveLayers({ tokens, globals, ...(rest.length === 2 ? { overrides: rest[0] } : {}), atoms: rest.at(-1) });
     } catch (e) {
       err(`purser: --layers: ${e.message}\n`);
       return 2;

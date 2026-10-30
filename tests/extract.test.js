@@ -40,6 +40,21 @@ export function C() { return <div className={css.props(s.a, s.b)} />; }
   assert.equal(calls[1].line, 8);
 });
 
+test('css.globals takes an optional options object; the others take one argument', { skip }, () => {
+  const { calls, diagnostics } = run(`
+import { css } from '@avonao/purser';
+const over = { layer: 'overrides' } as const;
+css.globals({ '.hc *': { opacity: 1 } }, over);
+css.globals({}, {}, {});
+css.create({ a: { opacity: 1 } }, {});
+`);
+  assert.deepEqual(calls.map((c) => [c.kind, c.options]), [['globals', { layer: 'overrides' }]]);
+  assert.deepEqual(diagnostics.map((d) => d.message), [
+    'css.globals takes one argument and an optional options object',
+    'css.create takes exactly one argument',
+  ]);
+});
+
 test('renamed and namespace imports are recognised', { skip }, () => {
   const { calls } = run(`
 import { css as c } from '@avonao/purser';

@@ -72,7 +72,7 @@ css.create({ a: { animationName: fade, animationDuration: '200ms' } });
 
 Returns the generated name. Frames are `from`, `to` or percentages, and hold plain (non-conditional) properties. Identical keyframes share one name.
 
-## `css.globals(rules)`
+## `css.globals(rules, options?)`
 
 ```ts
 css.globals({
@@ -88,6 +88,12 @@ css.globals({
 Keys are selectors (selector lists are split), or `'@font-face'` with one object or an array. Values follow the same rules as `css.create`, including conditions, longhands only, tokens for colours and no `!important`. A global may not redeclare a token's custom property.
 
 The build makes globals exclusive with each other (a later rule wins) and with atoms (a global gives way on elements carrying an atom class for the same property). Globals are compiled from source, so the call does nothing at runtime.
+
+`options.layer` is `'globals'` (the default) or `'overrides'`. Overrides are globals in a layer of their own: the build makes them exclusive with the other globals and with atoms in the same way, and writes them to the overrides layer, between globals and atoms. Where an override and a plain global match the same element, the override wins, whatever the order of the calls. They are for a project adopting Purser next to existing CSS, for page-wide rules that must win over the old CSS but not over components that have moved, such as a high-contrast or reduced-motion mode the old CSS forced with `!important`. See [Adopting Purser next to existing CSS](nextjs.md#adopting-purser-next-to-existing-css).
+
+```ts
+css.globals({ '.hc *': { boxShadow: 'none', transitionProperty: 'none' } }, { layer: 'overrides' });
+```
 
 ## `createCss(options)`
 
@@ -128,7 +134,7 @@ interface BuildOptions {
   salt?: string;        // default ""
   packageName?: string; // default "@avonao/purser"
   cssModule?: string;   // module exporting a custom css = createCss({ … })
-  layers?: { tokens?: string; globals?: string; atoms?: string }; // cascade layer names
+  layers?: { tokens?: string; globals?: string; overrides?: string; atoms?: string }; // cascade layer names
 }
 
 interface BuildResult {
@@ -148,10 +154,10 @@ The build scans `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.mts`, `.cts` and `.cjs` 
 purser build --project <dir> --src <dirs> --tokens <file> --out <file> [--watch]
 purser check --project <dir> --src <dirs> --tokens <file>
   [--prefix <name>] [--salt <text>] [--package <name>] [--css-module <file>]
-  [--layers <tokens>,<globals>,<atoms>]
+  [--layers <tokens>,<globals>[,<overrides>],<atoms>]
 ```
 
-`--layers` (and the `layers` build option) names the three cascade layers. The defaults are `purser.tokens`, `purser.globals` and `purser.atoms`, which are sublayers of one `purser` layer and therefore sit together in the cascade. Give them top-level names when Purser joins an existing stylesheet; see [Adopting Purser next to existing CSS](nextjs.md#adopting-purser-next-to-existing-css).
+`--layers` (and the `layers` build option) names the cascade layers. The defaults are `purser.tokens`, `purser.globals`, `purser.overrides` and `purser.atoms`, which are sublayers of one `purser` layer and therefore sit together in the cascade. The overrides layer is written only when a `css.globals` call asks for it; three names leave it at its default. Give them top-level names when Purser joins an existing stylesheet; see [Adopting Purser next to existing CSS](nextjs.md#adopting-purser-next-to-existing-css).
 
 Exit codes: `0` for success, `1` for rule violations or errors (each printed as `file:line:column: error: message`), and `2` for usage errors.
 

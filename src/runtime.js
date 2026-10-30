@@ -77,8 +77,9 @@ export function createCss(options) {
    * Declare global rules (:root, html, body, resets, @font-face, …).
    * Compiled by the build; a no-op at runtime.
    * @param {Record<string, unknown>} _rules
+   * @param {{ layer?: 'globals' | 'overrides' }} [_options]
    */
-  function globals(_rules) {}
+  function globals(_rules, _options) {}
 
   return Object.freeze({ create, props, keyframes, globals });
 }
