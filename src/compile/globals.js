@@ -44,9 +44,11 @@ export function parseGlobalSelector(sel, path) {
   const m = PE_RE.exec(s);
   if (m) {
     pe = m[1].startsWith('::') ? m[1] : `:${m[1]}`;
-    subject = s.slice(0, m.index).trim();
+    const head = s.slice(0, m.index);
+    // `.site ::placeholder` is the placeholder of any element inside .site: the space is a descendant combinator.
+    subject = head.trim() && head.endsWith(' ') ? `${head.trim()} *` : head.trim();
   }
-  if (!subject || /[\s>+~]$/.test(subject)) subject = `${subject}*`;
+  if (!subject || /[>+~]$/.test(subject)) subject = `${subject}*`;
   if (subject.includes('::')) throw new PurserError(`the pseudo-element must come last in "${s}"`, path);
   return { subject, pe };
 }
