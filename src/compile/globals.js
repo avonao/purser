@@ -156,7 +156,29 @@ export function compileGlobals(calls, coverage) {
       cov,
     );
   }
-  return { rules: emitted.map((e) => e.rule).filter(Boolean), fontFaces: fontFaces.map((f) => f.decls), items };
+  return { rules: mergeSameSelector(emitted.map((e) => e.rule).filter(Boolean)), fontFaces: fontFaces.map((f) => f.decls), items };
+}
+
+/**
+ * Rules with the same at-rules and selector become one rule, at the first one's place, with its declarations sorted by
+ * property. Moving a rule is safe because globals are exclusive: no two of them set one property on the same element,
+ * so their order decides nothing, and conflicting longhands (margin-left, margin-inline-start) never share a selector.
+ */
+function mergeSameSelector(rules) {
+  const bySelector = new Map();
+  const out = [];
+  for (const r of rules) {
+    const key = [...r.atRules, r.selectors.join(',')].join('\u0000');
+    const seen = bySelector.get(key);
+    if (seen) seen.decls.push(...r.decls);
+    else {
+      const rule = { ...r, decls: [...r.decls] };
+      bySelector.set(key, rule);
+      out.push(rule);
+    }
+  }
+  for (const r of out) r.decls.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return out;
 }
 
 const TYPE_SELECTOR = /^[a-zA-Z][\w-]*$/;

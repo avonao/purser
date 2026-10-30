@@ -50,21 +50,27 @@
   }
   :root:not(:is(.dark)) { color-scheme: light; }
   :root:is(.dark) { color-scheme: dark; }
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+    margin-left: 0;
+    margin-right: 0;
+  }
   *:not(.xlyif4tl) { margin-top: 0; }
-  * { margin-right: 0; }
   *:not(.xravh24s) { margin-bottom: 0; }
-  * { margin-left: 0; }
-  *::before { box-sizing: border-box; }
-  *::before { margin-top: 0; }
-  *::before { margin-right: 0; }
-  *::before { margin-bottom: 0; }
-  *::before { margin-left: 0; }
-  *::after { box-sizing: border-box; }
-  *::after { margin-top: 0; }
-  *::after { margin-right: 0; }
-  *::after { margin-bottom: 0; }
-  *::after { margin-left: 0; }
+  *::before {
+    box-sizing: border-box;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+  }
+  *::after {
+    box-sizing: border-box;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+  }
   body { font-family: var(--font-sans); }
   body:not(.xce3dr7w, .xo6613xh, .xyyhqh81) { color: var(--color-text); }
   body:not(.x9qvl7nn, .xgxnnz45) { background-color: var(--color-surface); }

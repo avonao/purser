@@ -21,7 +21,7 @@ test('named layers rename the statement and every block', () => {
   const { css: out, diagnostics } = compileStylesheet({ calls, layers });
   assert.deepEqual(diagnostics, []);
   assert.ok(out.includes('\n@layer purser-tokens, purser-globals, purser-atoms;\n'));
-  assert.match(out, /\n@layer purser-globals \{\n {2}body \{ margin-top: 0; \}/);
+  assert.match(out, /\n@layer purser-globals \{\n {2}body \{\n {4}margin-bottom: 0;\n {4}margin-left: 0;\n {4}margin-right: 0;\n {4}margin-top: 0;\n {2}\}/);
   assert.match(out, new RegExp(`\\n@layer purser-atoms \\{\\n {2}\\.${css.create(style).a.color} \\{ color: var\\(--x\\); \\}`));
   assert.ok(!/@layer purser\./.test(out));
 });
