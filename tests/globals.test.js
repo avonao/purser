@@ -22,6 +22,17 @@ test('globals exclude elements that carry an atom class for the same property', 
   assert.match(g, /\n {2}\* \{\n {4}margin-bottom: 0;\n {4}margin-left: 0;\n {4}margin-right: 0;\n {2}\}/);
 });
 
+test('a pseudo-element after a space belongs to the descendants', () => {
+  const { css: out } = compileStylesheet({
+    calls: [{ kind: 'globals', value: { '::placeholder': { opacity: 1 }, '.site ::placeholder': { opacity: 0.5 }, '.box > ::before': { content: '""' } } }],
+  });
+  const g = layerBody(out, 'purser.globals');
+  assert.match(g, /\n {2}\*:not\(\.site \*\)::placeholder \{ opacity: 1; \}/);
+  assert.match(g, /\n {2}\.site \*::placeholder \{ opacity: 0\.5; \}/);
+  assert.match(g, /\n {2}\.box > \*::before \{ content: ""; \}/);
+  assert.doesNotMatch(g, /\.site::placeholder/);
+});
+
 test('globals with the same selector are one rule, declarations sorted', () => {
   const { css: out } = compileStylesheet({
     calls: [{ kind: 'globals', value: { 'h1, h2': { fontWeight: 'inherit', fontSize: 'inherit' }, h1: { color: 'inherit' } } }],
