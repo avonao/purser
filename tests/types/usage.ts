@@ -33,6 +33,11 @@ const s = css.create({
     stroke: 'currentColor',
   },
   plain: { lineHeight: 1.5, gap: `calc(${t.space[4]} * 2)` },
+  // System colours under forced colours.
+  forced: {
+    color: { default: t.color.text, '@media (forced-colors: active)': 'ButtonText' },
+    backgroundColor: { default: t.color.text, '@media (forced-colors: active)': { default: 'Canvas', ':hover': 'Highlight' } },
+  },
 });
 
 css.create({

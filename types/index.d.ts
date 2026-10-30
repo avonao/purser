@@ -74,8 +74,19 @@ export declare function defineTokens<const T extends TokenDefinition>(definition
 /** CSS-wide keywords. */
 export type CSSWideKeyword = 'inherit' | 'initial' | 'unset' | 'revert' | 'revert-layer';
 
-/** Where a colour is expected: a colour token, currentColor or a CSS-wide keyword. Raw colours are a type error. */
-export type ColorValue = ColorToken | 'currentColor' | 'currentcolor' | CSSWideKeyword;
+/**
+ * The CSS Color 4 system colours. In forced colours (Windows contrast themes) the system palette replaces every
+ * author colour, and a style that sets one there names these. Keywords are case-insensitive in CSS: both spellings pass.
+ */
+export type SystemColor =
+  | 'AccentColor' | 'AccentColorText' | 'ActiveText' | 'ButtonBorder' | 'ButtonFace' | 'ButtonText' | 'Canvas'
+  | 'CanvasText' | 'Field' | 'FieldText' | 'GrayText' | 'Highlight' | 'HighlightText' | 'LinkText' | 'Mark'
+  | 'MarkText' | 'SelectedItem' | 'SelectedItemText' | 'VisitedText';
+/**
+ * Where a colour is expected: a colour token, currentColor, a system colour or a CSS-wide keyword. Raw colours are a
+ * type error.
+ */
+export type ColorValue = ColorToken | 'currentColor' | 'currentcolor' | SystemColor | Lowercase<SystemColor> | CSSWideKeyword;
 /** Shadows: a shadow token, `none`, a keyword, or a string built from tokens (checked by the build). */
 export type ShadowValue = ShadowToken | 'none' | CSSWideKeyword | `${string}var(--${string})${string}`;
 /** Any other value. Numbers get `px` except for unitless properties. */
