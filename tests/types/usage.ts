@@ -33,6 +33,8 @@ const s = css.create({
     stroke: 'currentColor',
   },
   plain: { lineHeight: 1.5, gap: `calc(${t.space[4]} * 2)` },
+  // A colour the page already defines, and a mix with a token.
+  inherited: { color: { default: 'var(--gray-900)', ':hover': `color-mix(in oklab, currentcolor 50%, ${t.color.text})` } },
   // System colours under forced colours.
   forced: {
     color: { default: t.color.text, '@media (forced-colors: active)': 'ButtonText' },

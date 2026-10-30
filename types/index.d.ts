@@ -83,10 +83,19 @@ export type SystemColor =
   | 'CanvasText' | 'Field' | 'FieldText' | 'GrayText' | 'Highlight' | 'HighlightText' | 'LinkText' | 'Mark'
   | 'MarkText' | 'SelectedItem' | 'SelectedItemText' | 'VisitedText';
 /**
- * Where a colour is expected: a colour token, currentColor, a system colour or a CSS-wide keyword. Raw colours are a
- * type error.
+ * Where a colour is expected: a colour token, currentColor, a system colour, a CSS-wide keyword, a `var(--name)` of a
+ * custom property the page already defines (the build scans its fallback for raw colours), or a `color-mix()` of
+ * those (the build converts the colours in it). Raw colours are a type error.
  */
-export type ColorValue = ColorToken | 'currentColor' | 'currentcolor' | SystemColor | Lowercase<SystemColor> | CSSWideKeyword;
+export type ColorValue =
+  | ColorToken
+  | 'currentColor'
+  | 'currentcolor'
+  | SystemColor
+  | Lowercase<SystemColor>
+  | CSSWideKeyword
+  | `var(--${string})${string}`
+  | `color-mix(${string})`;
 /** Shadows: a shadow token, `none`, a keyword, or a string built from tokens (checked by the build). */
 export type ShadowValue = ShadowToken | 'none' | CSSWideKeyword | `${string}var(--${string})${string}`;
 /** Any other value. Numbers get `px` except for unitless properties. */

@@ -83,7 +83,7 @@ Every custom property is declared by exactly one rule in any root state. The bui
 
 ## 5. Colours
 
-Raw colours are rejected in every style value (atoms, globals and keyframes): hex, colour functions, and named colours (including `transparent`) in colour-bearing properties. In the types, colour properties accept only `Token<'color'>`, `currentColor`, the CSS Color 4 system colours (`Canvas`, `ButtonText`, `Highlight` and the rest) and CSS-wide keywords. System colours are allowed because forced colours (Windows contrast themes) replace every author colour with the system palette, and a style that sets a colour there has to name it.
+Raw colours are rejected in every style value (atoms, globals and keyframes): hex, colour functions, and named colours (including `transparent`) in colour-bearing properties. In the types, colour properties accept only `Token<'color'>`, `currentColor`, `var(--name)` and `color-mix()` values, the CSS Color 4 system colours (`Canvas`, `ButtonText`, `Highlight` and the rest) and CSS-wide keywords. System colours are allowed because forced colours (Windows contrast themes) replace every author colour with the system palette, and a style that sets a colour there has to name it.
 
 Token values are converted to `lab()` following CSS Color 4:
 
