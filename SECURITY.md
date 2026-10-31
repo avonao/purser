@@ -6,11 +6,7 @@ Purser is pre-1.0. Security fixes are made on the latest release line only.
 
 ## Reporting a vulnerability
 
-Please do not open a public issue. Report privately to:
-
-**[SECURITY CONTACT EMAIL — placeholder, to be supplied by the maintainers]**
-
-Include a description, the affected version, and a minimal reproduction if possible. We aim to acknowledge reports within 5 working days.
+Please **do not** open a public issue. Report the vulnerability privately through GitHub's private vulnerability reporting (the **Report a vulnerability** button on the repository's *Security* tab) with a description, the affected version and a minimal reproduction if possible. We aim to acknowledge reports within 5 working days.
 
 ## Scope
 
