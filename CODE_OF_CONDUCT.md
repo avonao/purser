@@ -7,8 +7,6 @@ All contributors and maintainers are expected to follow it in every project spac
 
 ## Reporting
 
-Report unacceptable behaviour to the project team at:
-
-**[CONDUCT CONTACT EMAIL — placeholder, to be supplied by the maintainers]**
+Report violations privately to the maintainers through the repository's *Security* tab (**Report a vulnerability**, choose *Code of conduct* in the title) or by contacting a maintainer listed on the organization page. Reports are handled confidentially.
 
 All reports will be reviewed and investigated promptly and fairly, and the reporter's privacy will be respected. Enforcement follows the Contributor Covenant 2.1 enforcement guidelines.
