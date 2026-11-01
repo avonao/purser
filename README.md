@@ -21,7 +21,7 @@ Purser CSS (Purser for short) is a **compiler**. You write styles next to your c
 
 It needs **no bundler plugin and no runtime stylesheet work**. The only inputs are your source files and a tokens module, and the only output is a CSS file that any framework can import.
 
-Purser is a sister product of [Hypdriv](https://github.com/avonao/hypdriv), Avonao's sidecar for performance, security and observability on Cloudflare Workers, Vercel and Node. Hypdriv runs the Purser build and watch inside `withHypDriv`, guards against a stale stylesheet, reports atom usage per route and audits a deployment for zero overrides.
+Purser is a sister product of [Hypdriv](https://github.com/avonao/hypdriv), Avonao's sidecar for performance, security and observability on Cloudflare Workers, Vercel and Node. On Next.js, Hypdriv runs the Purser build and watch inside `withHypDriv`. On every supported host, including the Vite frameworks, it guards against a stale stylesheet, reports atom usage per route and audits a deployment for zero overrides.
 
 Homepages: [pursercss.dev](https://pursercss.dev) · [purser.avonao.dev](https://purser.avonao.dev)
 
@@ -72,7 +72,8 @@ Purser has no framework dependency: it reads your source with TypeScript, and wr
 | --- | --- | --- |
 | Next.js 16 (Turbopack and `--webpack`) | CLI watcher beside `next dev`, a build step before `next build`, [guide](docs/nextjs.md) | Verified |
 | Any framework that imports a CSS file and takes a `className` string | The CLI, or the `@avonao/purser/build` API | Same mechanism, no framework-specific guide yet |
-| Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext, Next.js on Cloudflare and Vercel | [Hypdriv](https://github.com/avonao/hypdriv) runs the build inside its own integration | See the Hypdriv repository |
+| Next.js 16 on Cloudflare Workers and Vercel | [Hypdriv](https://github.com/avonao/hypdriv) runs the Purser build and watch in-process through `withHypDriv` | See the Hypdriv repository |
+| Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext | You generate the stylesheet with `purser build` (or `hypdriv css build`) as a build step; Hypdriv then checks the built pages for atoms missing from it | See the Hypdriv repository |
 
 The generated stylesheet uses `lab()` and cascade layers, so it targets Chrome and Edge 111, Firefox 113 and Safari 15.4 or later. Older browsers receive no colour; if you must support them, show them a fallback notice instead of lowering the target (a lower target makes a CSS minifier write a struck fallback copy before every `lab()` value).
 
@@ -359,11 +360,13 @@ Peer dependencies: `typescript` ≥ 5.0 (the build parses your source with it) a
 
 [Hypdriv](https://github.com/avonao/hypdriv) is Avonao's sidecar for Next.js and Vite hosts on Cloudflare Workers, Vercel and Node. Its Purser bridge (`@hypdriv/purser`, `hypdriv css`) adds, on top of the build described here:
 
-- the Purser build and watch in-process inside `withHypDriv`;
-- an unstyled-atom guard, so a stale stylesheet fails the build;
-- atom usage per route in the route manifest;
-- flashless themes pinned at the edge;
-- zero-override audits of a running deployment with headless Chrome (`hypdriv audit css`).
+- on Next.js, the Purser build and watch in-process inside `withHypDriv`;
+- on every host, an unstyled-atom guard that flags a stale stylesheet at build time (`purser.verify`: `error`, `warn` or `off`);
+- on every host, atom usage per route in the route manifest;
+- on every host, flashless themes pinned at the edge;
+- on every host, zero-override audits of a running deployment with headless Chrome (`hypdriv audit css`).
+
+On the Vite hosts (Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext) Hypdriv does not run the Purser build. You generate the stylesheet with `purser build` or `hypdriv css build` as a step before the framework build, and Hypdriv's build guard confirms that every atom the built pages use is in it. `hypdriv css check` validates the Purser build in CI without writing the file.
 
 Hypdriv needs `@avonao/purser` 0.1 or later, installed separately. Purser works on its own, without Hypdriv. See Hypdriv's [Purser CSS guide](https://github.com/avonao/hypdriv/blob/main/docs/guides/purser.md).
 
