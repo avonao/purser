@@ -13,7 +13,7 @@ const SHORT_SPACE = SHORT_FIRST.length * SHORT_REST.length ** 3;
 
 // The salt and the naming mode can come from the environment, so an app that imports the default `css` can set them without
 // changing an import: in Node (the build, server rendering) from the process, in a bundle from a value the bundler inlines
-// (Next.js: `env: { PURSER_SALT }` in next.config). A missing `process` or value falls back to no salt and short names.
+// (Next.js: `env: { PURSER_SALT }` in next.config). A missing `process` or value falls back to no salt and the legacy names, so a project switches to short names on purpose (PURSER_NAMES=short).
 const ENV_SALT = typeof process !== 'undefined' && process.env && typeof process.env.PURSER_SALT === 'string' ? process.env.PURSER_SALT : undefined;
 const ENV_NAMES = typeof process !== 'undefined' && process.env && typeof process.env.PURSER_NAMES === 'string' ? process.env.PURSER_NAMES : undefined;
 
@@ -63,7 +63,7 @@ export function makeName(input, naming) {
  * @returns {{ prefix: string, salt: string, names: 'short' | 'legacy' }}
  */
 export function resolveNaming(opts = {}) {
-  const names = opts.names ?? ENV_NAMES ?? 'short';
+  const names = opts.names ?? ENV_NAMES ?? 'legacy';
   if (names !== 'short' && names !== 'legacy') throw new TypeError(`purser: names must be "short" or "legacy", not "${names}"`);
   const prefix = opts.prefix ?? 'x';
   const salt = opts.salt ?? ENV_SALT ?? '';

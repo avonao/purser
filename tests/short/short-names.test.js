@@ -4,7 +4,7 @@ import { compileStylesheet } from '../../src/compile/stylesheet.js';
 import { makeName, resolveNaming } from '../../src/hash.js';
 import { createCss } from '../../src/index.js';
 
-// Run without PURSER_NAMES: the default is short names.
+// Short names are chosen explicitly here.
 const naming = resolveNaming({ names: 'short' });
 
 test('short names are 4 characters, start with a letter, and are deterministic', () => {
@@ -15,7 +15,7 @@ test('short names are 4 characters, start with a letter, and are deterministic',
   }
 });
 
-test('the default is short; legacy stays available (names option)', () => {
+test('short is chosen by option; the default stays legacy', () => {
   const short = createCss({ names: 'short' }).create({ a: { opacity: 1 } }).a.opacity;
   const legacy = createCss({ names: 'legacy' }).create({ a: { opacity: 1 } }).a.opacity;
   assert.equal(short.length, 4);
