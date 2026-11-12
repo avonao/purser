@@ -67,7 +67,7 @@ export function resolveLayers(layers = {}) {
  * @returns {{ css: string | null, diagnostics: Diagnostic[], stats: { atoms: number, rules: number, keyframes: number, tokens: number } }}
  */
 export function compileStylesheet(input) {
-  const naming = resolveNaming({ prefix: input.prefix, salt: input.salt });
+  const naming = resolveNaming({ prefix: input.prefix, salt: input.salt, names: input.names });
   const names = resolveLayers(input.layers);
   /** @type {Diagnostic[]} */
   const diagnostics = [];

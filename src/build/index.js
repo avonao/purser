@@ -17,7 +17,8 @@ import { selfCheck } from './selfcheck.js';
  * @property {string} [tokens]            tokens module path, relative to projectDir
  * @property {string} [out]               output CSS file, relative to projectDir (omit to only validate)
  * @property {string} [prefix]            class name prefix (default "x"); must match createCss({ prefix })
- * @property {string} [salt]              hash salt (default ""); must match createCss({ salt })
+ * @property {string} [salt]              hash salt (default: PURSER_SALT, else ""); must match createCss({ salt })
+ * @property {"short"|"legacy"} [names]    class names: "short" (default, 4 characters) or "legacy" (prefix + 7); must match createCss({ names })
  * @property {string} [packageName]       runtime import specifier (default "@avonao/purser")
  * @property {string} [cssModule]         module exporting a custom `css = createCss({ … })`, relative to projectDir
  * @property {{ tokens?: string, globals?: string, atoms?: string }} [layers]  cascade layer names (default purser.tokens, purser.globals, purser.atoms)
@@ -42,7 +43,7 @@ export function createBuilder(options) {
   const tokensFile = options.tokens ? path.resolve(projectDir, options.tokens) : null;
   const outFile = options.out ? path.resolve(projectDir, options.out) : null;
   const cssModuleReal = options.cssModule ? real(path.resolve(projectDir, options.cssModule)) : null;
-  const naming = resolveNaming({ prefix: options.prefix, salt: options.salt });
+  const naming = resolveNaming({ prefix: options.prefix, salt: options.salt, names: options.names });
   const layers = resolveLayers(options.layers);
   const ts = loadTypeScript(projectDir);
   const postcss = loadPostcss(projectDir);
@@ -113,6 +114,7 @@ export function createBuilder(options) {
       calls,
       prefix: options.prefix,
       salt: options.salt,
+      names: options.names,
       layers,
     });
     diagnostics.push(...compiled.diagnostics);

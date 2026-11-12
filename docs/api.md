@@ -164,3 +164,9 @@ Exit codes: `0` for success, `1` for rule violations or errors (each printed as 
 ## `scripts/strike-count.js`
 
 An in-page script. Evaluating it returns `{ count, struck: [{ element, pseudo, property, sources }], rules, skipped }` for the page's current state. It also defines `globalThis.purserStrikeCount()` so you can call it again after changing hover, focus or width. `@container` rules are reported in `skipped`, because they cannot be evaluated from script.
+
+## Class names (short by default)
+
+Class names are 4 characters: a letter, then three from `A-Za-z0-9_-` (about 13.6 million names). The build refuses two atoms with the same name. When it does, run `purser build ... --find-salt`: it tries salts (`""`, `s1`, `s2`, ...) until none collides and prints `PURSER_SALT=<salt>`. Give the same salt to the build and to the runtime: `createCss({ salt })`, or, for the default `css`, set `PURSER_SALT` in the environment of the build and of the server, and for the browser bundle let the bundler inline it (Next.js: `env: { PURSER_SALT: "<salt>" }` in `next.config`). Changing the salt renames every class, so regenerate the stylesheet and redeploy together.
+
+The previous names (`x` + 7 characters) stay available: `createCss({ names: "legacy" })`, `--names legacy`, or `PURSER_NAMES=legacy`.

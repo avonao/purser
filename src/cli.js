@@ -17,7 +17,9 @@ Options:
   --out <file>       generated stylesheet (build only)
   --watch            rebuild on change (build only)
   --prefix <name>    class name prefix (default "x"); must match createCss({ prefix })
-  --salt <text>      hash salt (default ""); must match createCss({ salt })
+  --salt <text>      hash salt (default: $PURSER_SALT, else ""); must match createCss({ salt })
+  --names <mode>     short (default, 4-character class names) or legacy (x + 7 characters); must match createCss({ names })
+  --find-salt        build only: try salts until the class names have no collision, print the one to use (PURSER_SALT), write nothing
   --package <name>   runtime import specifier (default "@avonao/purser")
   --css-module <f>   module exporting a custom css = createCss({ prefix, salt })
   --layers <t,g,a>   names of the tokens, globals and atoms cascade layers
@@ -52,6 +54,8 @@ export async function main(argv, io = {}) {
         watch: { type: 'boolean', default: false },
         prefix: { type: 'string' },
         salt: { type: 'string' },
+        names: { type: 'string' },
+        'find-salt': { type: 'boolean', default: false },
         package: { type: 'string' },
         'css-module': { type: 'string' },
         layers: { type: 'string' },
@@ -108,6 +112,7 @@ export async function main(argv, io = {}) {
     out: command === 'build' ? v.out : undefined,
     prefix: v.prefix,
     salt: v.salt,
+    names: v.names,
     packageName: v.package,
     cssModule: v['css-module'],
     layers,
@@ -131,6 +136,21 @@ export async function main(argv, io = {}) {
   };
 
   try {
+    if (v['find-salt']) {
+      // Short names: find a salt under which no two atoms share a class name. Deterministic: "" first, then s1, s2, ...
+      for (let i = 0; i < 400; i++) {
+        const salt = i === 0 ? (options.salt ?? process.env.PURSER_SALT ?? '') : `s${i}`;
+        const result = await check({ ...options, salt, out: undefined });
+        const errors = result.diagnostics.filter((d) => d.severity === 'error');
+        if (errors.some((d) => !/collision/.test(d.message))) return print(result);
+        if (!errors.length) {
+          out(`purser: salt ${JSON.stringify(salt)} has no class name collision (${result.stats.atoms} classes)\nPURSER_SALT=${salt}\n`);
+          return 0;
+        }
+      }
+      err('purser: no collision-free salt in 400 tries\n');
+      return 1;
+    }
     if (command === 'build' && v.watch) {
       await watch(options, print);
       out('purser: watching for changes (Ctrl+C to stop)\n');
