@@ -59,9 +59,11 @@ const classLit = (className, neg) => ({ kind: 'class', text: className, neg });
 /**
  * @param {{ def: Record<string, unknown>, origin: unknown }[]} calls in authoring order
  * @param {Map<string, import('./atoms.js').AtomCoverage[]>} coverage
+ * @param {(name: string) => string[]} [namesOf]  the names an element carries for an atom class (several when fused
+ *   classes include it, none when nothing applies it)
  * @returns {{ rules: import('./render.js').CssRule[], fontFaces: [string, string][][], items: object[] }}
  */
-export function compileGlobals(calls, coverage) {
+export function compileGlobals(calls, coverage, namesOf = (name) => [name]) {
   const items = [];
   const fontFaces = [];
   calls.forEach((call, callIndex) => {
@@ -118,8 +120,10 @@ export function compileGlobals(calls, coverage) {
     const regions = disjointify(branches.map((b) => b.conj), order);
     const cov = [...related]
       .flatMap((p) => coverage.get(`${pe}|${p}`) ?? [])
-      .sort((a, b) => (a.className < b.className ? -1 : 1));
-    const noClass = cov.map((c) => classLit(c.className, true));
+      .sort((a, b) => (a.classNames[0] < b.classNames[0] ? -1 : a.classNames[0] > b.classNames[0] ? 1 : 0));
+    // Every class that sets one of these properties on an element (with rule granularity several trees share classes).
+    const atomClasses = [...new Set(cov.flatMap((c) => c.classNames))].sort();
+    const noClass = atomClasses.map((name) => classLit(name, true));
 
     // Group terms by (item, value) so merging never drops an item's own subject.
     const groups = new Map();
@@ -137,15 +141,16 @@ export function compileGlobals(calls, coverage) {
         for (const term of mergeTerms(terms)) {
           const base = and(term, noClass);
           ruleTerms.push({ term: base, value });
-          emitted.push({ item, rule: renderGlobal(item, base, value) });
+          emitted.push({ item, rule: renderGlobal(item, base, value, namesOf) });
           // (a null rule is unsatisfiable by tag names; the verifier still sees its term)
           for (const c of cov) {
+            if (c.className === null) continue; // no gap: nothing for a global rule to fill
             for (const gap of c.gaps) {
               const withClass = and(term, [classLit(c.className, false)]);
               const t = withClass && and(withClass, gap);
               if (!t) continue;
               ruleTerms.push({ term: t, value });
-              emitted.push({ item, rule: renderGlobal(item, t, value) });
+              emitted.push({ item, rule: renderGlobal(item, t, value, namesOf) });
             }
           }
         }
@@ -156,6 +161,7 @@ export function compileGlobals(calls, coverage) {
       branches.map((b) => (b.own ? b : { ...b, value: null })),
       ruleTerms,
       cov,
+      atomClasses,
     );
   }
   return { rules: mergeSameSelector(emitted.map((e) => e.rule).filter(Boolean)), fontFaces: fontFaces.map((f) => f.decls), items };
@@ -215,7 +221,7 @@ function decidedByTag(subject, other) {
 }
 
 /** Render one global rule: subject + other literals + class exclusions + pseudo-element. Null when dead. */
-function renderGlobal(item, term, value) {
+function renderGlobal(item, term, value, namesOf = (name) => [name]) {
   const { selector, atRules } = renderTerm(term);
   let suffix = '';
   const excluded = [];
@@ -233,17 +239,21 @@ function renderGlobal(item, term, value) {
       }
       suffix += l.neg ? `:not(${l.text})` : `:is(${l.text})`;
     } else if (l.kind === 'class') {
-      if (l.neg) excluded.push(`.${l.text}`);
-      else suffix += `.${l.text}`;
+      // An element has the atom class when it carries any of the names it is written under.
+      const names = namesOf(l.text);
+      if (l.neg) {
+        for (const n of names) if (!excluded.includes(`.${n}`)) excluded.push(`.${n}`);
+      } else if (names.length === 0) return null; // nothing applies the class: the rule matches no element
+      else suffix += names.length === 1 ? `.${names[0]}` : `:is(${names.map((n) => `.${n}`).join(', ')})`;
     } else suffix += l.neg ? `:not(${l.text})` : l.text;
   }
   if (excluded.length) suffix += `:not(${excluded.join(', ')})`;
   return { atRules, selectors: [`${item.subject}${suffix}${item.pe}`], decls: [[item.prop, value]], layer: item.layer };
 }
 
-/** Self-check: globals plus every atom class for the property are exclusive. */
-function verify(list, branches, ruleTerms, cov) {
-  const classIds = cov.map((c) => `class\u0001\u0001${c.className}`);
+/** Self-check: globals plus the classes of every atom tree for the property are exclusive. */
+function verify(list, branches, ruleTerms, cov, atomClasses) {
+  const idOf = (name) => `class\u0001\u0001${name}`;
   const check = (extraBranches, extraRules, fixed) => {
     const overlap = findOverlap([...branches, ...extraBranches], [...ruleTerms, ...extraRules], { fixed });
     if (overlap) {
@@ -253,13 +263,14 @@ function verify(list, branches, ruleTerms, cov) {
       );
     }
   };
-  check([], [], new Map(classIds.map((id) => [id, false])));
+  check([], [], new Map(atomClasses.map((name) => [idOf(name), false])));
   for (const c of cov) {
-    const fixed = new Map(classIds.map((id) => [id, id.endsWith(`\u0001${c.className}`)]));
-    const k = classLit(c.className, false);
-    // The atom's own rules are disjoint and exactly cover where it sets the
+    // An element with this tree: its classes are present, every other atom class for the property is absent.
+    const own = new Set(c.classNames);
+    const fixed = new Map(atomClasses.map((name) => [idOf(name), own.has(name)]));
+    // The tree's own rules are disjoint and exactly cover where it sets the
     // property (they are verified separately), so they serve as later branches.
-    const atomRules = c.rules.map((r) => ({ term: and([k], r.term), value: `atom:${r.value}` }));
+    const atomRules = c.rules.map((r) => ({ term: and([classLit(r.className, false)], r.term), value: `atom:${r.value}` }));
     check(atomRules.map((r) => ({ conj: r.term, value: r.value })), atomRules, fixed);
   }
 }

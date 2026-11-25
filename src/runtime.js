@@ -1,21 +1,40 @@
 // The runtime: css.create / css.props / css.keyframes / css.globals.
 // It computes class names with the same code the build uses, and never emits CSS.
 
-import { conflictsOf } from './conflicts.js';
 import { resolveNaming } from './hash.js';
-import { atomClassName, keyframesName, mergeKey, normalizeKeyframes, normalizeStyle } from './normalize.js';
+import { atomClassName, keyframesName, normalizeKeyframes, normalizeStyle } from './normalize.js';
+import { props, STYLE } from './props.js';
 
-/** Marks objects produced by css.create so css.props can reject anything else. */
-export const STYLE = Symbol.for('purser.style');
+export { STYLE };
+
+/**
+ * @param {(entry: import('./normalize.js').Entry, naming: object) => string} classNames  the class names of one atomic entry
+ * @param {(style: unknown, name: string) => Map<string, import('./normalize.js').Entry>} [normalize]  a build passes one
+ *   that remembers its results; the default normalises every time
+ */
+export function makeCreateCss(classNames, normalize = (style, name) => normalizeStyle(style, [name])) {
+  return (options) => build(resolveNaming(options), classNames, normalize);
+}
 
 /**
  * Create a `css` API with its own naming options. The build must be given the
- * same options (`prefix`, `salt`) so class names agree.
- * @param {{ prefix?: string, salt?: string }} [options]
+ * same options (`prefix`, `salt`, `names`) so class names agree.
+ *
+ * This entry keeps the browser bundle small: it computes one class per property. Rule granularity needs the code that
+ * compiles conditions, which is in `@avonao/purser/rule` (and costs nothing in a compiled module).
+ * @param {{ prefix?: string, salt?: string, names?: 'short' | 'legacy' | 'min', granularity?: 'property' | 'rule', rename?: (id: string) => string }} [options]
+ *   rename: with names 'min', the build's name for a class (set by the compiler, never by an application)
  */
-export function createCss(options) {
-  const naming = resolveNaming(options);
+export const createCss = makeCreateCss((entry, naming) => {
+  if (naming.granularity === 'rule') {
+    throw new TypeError(
+      'purser: granularity "rule" is computed by the compiler (@avonao/purser/vite, /webpack or /esbuild) or by the runtime in @avonao/purser/rule; import css or createCss from there',
+    );
+  }
+  return atomClassName(entry, naming);
+});
 
+function build(naming, classNames, normalize) {
   /**
    * Compile a map of named styles into class-name maps.
    * @param {Record<string, Record<string, unknown>>} styles
@@ -25,43 +44,13 @@ export function createCss(options) {
     const out = {};
     for (const name of Object.keys(styles)) {
       const compiled = {};
-      for (const entry of normalizeStyle(styles[name], [name]).values()) {
-        compiled[entry.key] = entry.tree === null ? null : atomClassName(entry, naming);
+      for (const entry of normalize(styles[name], name).values()) {
+        compiled[entry.key] = entry.tree === null ? null : classNames(entry, naming);
       }
       Object.defineProperty(compiled, STYLE, { value: true });
       out[name] = Object.freeze(compiled);
     }
     return Object.freeze(out);
-  }
-
-  /**
-   * Merge compiled styles left to right (later wins per property) and return
-   * the class string. Falsy arguments are ignored; arrays are flattened.
-   * @param {...unknown} styles
-   * @returns {string}
-   */
-  function props(...styles) {
-    const merged = new Map();
-    const visit = (s) => {
-      if (!s) return;
-      if (Array.isArray(s)) {
-        for (const x of s) visit(x);
-        return;
-      }
-      if (s[STYLE] !== true) throw new TypeError('purser: css.props only accepts styles returned by css.create');
-      for (const key of Object.keys(s)) {
-        // Drop earlier logical/physical twins (margin-top vs margin-block-start).
-        const space = key.lastIndexOf(' ');
-        const pe = space === -1 ? '' : key.slice(0, space);
-        for (const other of conflictsOf(key.slice(space + 1))) merged.delete(mergeKey(pe, other));
-        merged.delete(key);
-        merged.set(key, s[key]);
-      }
-    };
-    for (const s of styles) visit(s);
-    let out = '';
-    for (const cls of merged.values()) if (cls) out = out ? `${out} ${cls}` : cls;
-    return out;
   }
 
   /**

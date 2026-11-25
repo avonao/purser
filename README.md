@@ -3,29 +3,29 @@
 </p>
 
 <p align="center">
-  <strong>Compile-time atomic CSS in which an overridden declaration, an <code>!important</code> and a raw colour cannot happen.</strong>
+  <strong>Compile-time atomic CSS in which an overridden declaration, an <code>!important</code> and a raw colour cannot happen, compiled down to class names with no style code left in the browser.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/avonao/purser/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/avonao/purser/ci.yml?branch=main&label=ci"></a>
   <img alt="Status: Preview" src="https://img.shields.io/badge/status-preview-f59e0b">
-  <img alt="Version 0.1.0" src="https://img.shields.io/badge/version-0.1.0-0f766e">
+  <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-0f766e">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-0f766e"></a>
   <img alt="TypeScript 5+" src="https://img.shields.io/badge/TypeScript-5%2B-3178c6">
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000">
   <img alt="Node 22+" src="https://img.shields.io/badge/node-%E2%89%A522-339933">
-  <img alt="Zero runtime dependencies" src="https://img.shields.io/badge/runtime%20dependencies-0-0f766e">
+  <img alt="Nothing but class names in the browser" src="https://img.shields.io/badge/runtime%20dependencies-0-0f766e">
 </p>
 
 Purser CSS (Purser for short) is a **compiler**. You write styles next to your components in TypeScript or JavaScript. The build reads them statically and writes one deterministic, atomic stylesheet; the runtime only joins class names. Unlike most CSS-in-JS tools, Purser starts from a set of rules about the *output* and makes them impossible to break: a declaration is never struck through in DevTools, `!important` never appears, and every colour is a token written as `lab()`.
 
-It needs **no bundler plugin and no runtime stylesheet work**. The only inputs are your source files and a tokens module, and the only output is a CSS file that any framework can import.
+It works **without a bundler plugin**: the only inputs are your source files and a tokens module, and the only output is a CSS file that any framework can import. With its optional **compiler** (a plugin for Vite, Rollup, esbuild, webpack and Turbopack) nothing of the styling is left to run in the browser: a component's `className` is a string, and classes that are always applied together are one class. On a generated design system of 500 components that is [fewer bytes than StyleX, Tailwind CSS, UnoCSS, Panda CSS or vanilla-extract send](#benchmarks), with nothing overridden.
 
 Purser is a sister product of [Hypdriv](https://github.com/avonao/hypdriv), Avonao's sidecar for performance, security and observability on Cloudflare Workers, Vercel and Node. On Next.js, Hypdriv runs the Purser build and watch inside `withHypDriv`. On every supported host, including the Vite frameworks, it guards against a stale stylesheet, reports atom usage per route and audits a deployment for zero overrides.
 
 Homepages: [pursercss.dev](https://pursercss.dev) · [purser.avonao.dev](https://purser.avonao.dev)
 
-> **Preview.** Purser 0.1.0 is a Preview release. Preview releases are available to build with and evaluate ahead of general availability. The API and the generated class names can change between Preview versions, and Preview builds are not covered by a service-level agreement. The [Preview status](#preview-status) section lists what is included, what has been verified and the constraints that apply.
+> **Preview.** Purser 0.2.0 is a Preview release. Preview releases are available to build with and evaluate ahead of general availability. The API and the generated class names can change between Preview versions, and Preview builds are not covered by a service-level agreement. The [Preview status](#preview-status) section lists what is included, what has been verified and the constraints that apply.
 
 ## Contents
 
@@ -35,6 +35,8 @@ Homepages: [pursercss.dev](https://pursercss.dev) · [purser.avonao.dev](https:/
 - [Install a Preview build](#install-a-preview-build)
 - [Quickstart](#quickstart)
 - [How it works](#how-it-works)
+- [The compiler](#the-compiler)
+- [Benchmarks](#benchmarks)
 - [The guarantees](#the-guarantees)
 - [API](#api)
 - [Command line](#command-line)
@@ -57,10 +59,12 @@ Homepages: [pursercss.dev](https://pursercss.dev) · [purser.avonao.dev](https:/
 | **Colour tokens** | A raw colour in a component style is a type error and a build error · tokens with one value per combination of theme axes (mode, contrast, wallpaper, motion or any axes you define) · each custom property written exactly once for any root state |
 | **`lab()` everywhere** | Hex, `rgb()`, `hsl()`, `hwb()`, `oklch()`, `oklab()`, `lch()`, `color()` and named colours converted exactly with CSS Color 4 math (D50) |
 | **Atoms** | One class per declaration, shared by every identical definition · short stable hashes · deterministic output · box shorthands expanded to longhands, unsafe shorthands rejected with the longhands to use |
+| **Compiler** | Optional. `css.create` and `css.props` are computed at build time: a module keeps a string expression and no style code · plugins for Vite, Rollup, esbuild and webpack, a loader for Turbopack and Rspack · line numbers kept, source maps written |
+| **Smaller output** | One class per rule, so styles share the rules they have in common · the shortest class names there are, given by the build · classes that are always applied together fused into one (`fuse`) · styles nothing applies left out · a minified stylesheet |
 | **Globals** | `css.globals` for `:root`, `html`, `body`, a minimal reset, `::selection` and `@font-face`, made exclusive with each other and with atom classes · an optional overrides layer for a project that is still moving from existing CSS |
 | **Cascade layers** | Three named layers (tokens, globals, atoms) plus overrides, renamable with `--layers` so Purser can sit among an existing project's layers |
 | **Type safety** | Hand-written TypeScript declarations · colour properties accept only colour tokens · rejected shorthands show their advice in the type error |
-| **Tooling** | The `purser` CLI (`build`, `check`, `--watch`) · a JS build API · `scripts/strike-count.js` for any page · zero runtime dependencies |
+| **Tooling** | The `purser` CLI (`build`, `check`, `--watch`) · a JS build API · a build cache: an unchanged project is not parsed again · `scripts/strike-count.js` for any page · a benchmark suite against five other tools |
 
 The behaviour of every rule is described in [`docs/how-it-works.md`](docs/how-it-works.md).
 
@@ -72,6 +76,7 @@ Purser has no framework dependency: it reads your source with TypeScript, and wr
 | --- | --- | --- |
 | Next.js 16 (Turbopack and `--webpack`) | CLI watcher beside `next dev`, a build step before `next build`, [guide](docs/nextjs.md) | Verified |
 | Any framework that imports a CSS file and takes a `className` string | The CLI, or the `@avonao/purser/build` API | Same mechanism, no framework-specific guide yet |
+| Vite and every framework that builds with it, Rollup, esbuild, webpack, Rspack, Turbopack | The compiler's plugins and loader, [guide](docs/compiler.md#setup) | Tested against esbuild and against the hook contracts of Vite, Rollup and webpack |
 | Next.js 16 on Cloudflare Workers and Vercel | [Hypdriv](https://github.com/avonao/hypdriv) runs the Purser build and watch in-process through `withHypDriv` | See the Hypdriv repository |
 | Vite, React Router, TanStack Start, Astro, SvelteKit, Nuxt, vinext | You generate the stylesheet with `purser build` (or `hypdriv css build`) as a build step; Hypdriv then checks the built pages for atoms missing from it | See the Hypdriv repository |
 
@@ -82,7 +87,7 @@ The generated stylesheet uses `lab()` and cascade layers, so it targets Chrome a
 | Component | Requirement |
 | --- | --- |
 | Node.js | 22 or later. A TypeScript tokens module needs 22.18 or later (Node strips the types); on older versions write `tokens.js`. |
-| TypeScript in your project | 5.0 or later. The build uses your copy to parse your source and to resolve `tsconfig.json` paths. |
+| TypeScript in your project | Optional. The build parses with your copy when it is TypeScript 5 or 6, and with the copy Purser depends on otherwise (TypeScript 7 no longer has the parser API). `tsconfig.json` paths are resolved either way. |
 | PostCSS | 8.4 or later, optional. When installed, the build re-parses its own output as a self-check. |
 | Google Chrome | Optional, for the browser integration test (`PURSER_CHROME` names the binary). |
 | Next.js | 16, for the guide. Any framework that imports a CSS file works. |
@@ -97,18 +102,18 @@ Preview builds are not published to a package registry. Install from the source 
 ```sh
 git clone https://github.com/avonao/purser.git
 cd purser
-npm install          # installs the development tools (typescript, postcss) only
+npm install          # typescript (the parser the build uses) and the development tools
 npm test
 ```
 
-Purser has no build step and no runtime dependencies: the source in `src/` is the package.
+Purser has no build step: the source in `src/` is the package. Its one dependency, `typescript`, is used by the build and never reaches a browser.
 
 ### Into an application
 
 ```sh
-npm pack                                   # writes avonao-purser-0.1.0.tgz
+npm pack                                   # writes avonao-purser-0.2.0.tgz
 cd path/to/your-app
-npm install --save-dev ../purser/avonao-purser-0.1.0.tgz
+npm install --save-dev ../purser/avonao-purser-0.2.0.tgz
 ```
 
 Commit the tarball (for example in `vendor/purser/`) so CI installs the same bytes. A registry release follows the Preview.
@@ -231,13 +236,72 @@ The build runs the same ordered stages on every project:
 
 A stage that finds a violation reports it as `file:line:column: error: message` and the build writes nothing. The sequence, and the rules each stage enforces, are in [`docs/how-it-works.md`](docs/how-it-works.md).
 
+## The compiler
+
+Without it, `css.create` runs in the browser: a module ships its style objects and the code that names them. The compiler does that work in the build and writes the result into the module:
+
+```tsx
+// source
+const s = css.create({
+  card: { padding: t.space[4], color: { default: t.color.text, ':hover': t.color.accent } },
+  active: { color: t.color.accent },
+});
+export function Card({ active }: { active?: boolean }) {
+  return <div className={css.props(s.card, active && s.active)} />;
+}
+
+// compiled (with the options below)
+export function Card({ active }: { active?: boolean }) {
+  return <div className={("_a"+((active)?" _c":" _b"))} />;
+}
+```
+
+```css
+._b:hover,._c{color:var(--color-accent)}._b:not(:hover){color:var(--color-text)}._a{padding-bottom:var(--space-4);padding-left:var(--space-4);padding-right:var(--space-4);padding-top:var(--space-4)}
+```
+
+```ts
+// vite.config.ts
+import { purser } from '@avonao/purser/vite';
+
+export default defineConfig({
+  plugins: [purser({ tokens: 'src/lib/tokens.ts', src: ['src'], out: 'src/purser.css', granularity: 'rule', names: 'min', fuse: 'exact' })],
+});
+```
+
+The plugin also writes the stylesheet, so it replaces the `purser build` step. Four options shrink the output: `minify`, `granularity: 'rule'` (styles share the rules they have in common), `names: 'min'` (the shortest names, given by the build) and `fuse` (classes that are always applied together become one class; `'exact'` writes no rule twice, `'max'` gives every element as few classes as its `css.props` call has outcomes). The compiled result is computed with the runtime itself, so a compiled module and an uncompiled one give the same classes, and the test suite compares the computed styles of a page in every state across all modes.
+
+The compiler is optional, and a project that does not use it works as before. Setup for Vite, Rollup, Next.js (webpack and Turbopack), webpack, Rspack and esbuild, what is rewritten and what is left to the runtime: [`docs/compiler.md`](docs/compiler.md).
+
+## Benchmarks
+
+One design system of 500 components, generated from a seed, written out for each tool in its own idiom and built with it. Sizes are in kB after Brotli; *markup* is a page of 2,000 elements; *struck* is the number of declarations a browser overrides on that page.
+
+| | Stylesheet | JavaScript | Markup | **Total** | Struck | Build | Build again, nothing changed | Module load |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **Purser**, `fuse: 'exact'` | 7.3 | 25.1 | 22.0 | **54.4** | **0** | 889 ms | **54 ms** | **2.2 ms** |
+| **Purser**, `fuse: 'max'` | 25.5 | 11.7 | 10.9 | **48.1** | **0** | 966 ms | 61 ms | 2.1 ms |
+| Purser, runtime only (no compiler) | 27.7 | 43.7 | 36.6 | 108.0 | **0** | 765 ms | 64 ms | 117.3 ms |
+| vanilla-extract 1.21 | 41.7 | 10.9 | 9.1 | 61.8 | 1,801 | 2,201 ms | 2,136 ms | 3.9 ms |
+| Tailwind CSS 4.3 | 3.9 | 33.6 | 28.9 | 66.4 | 1,928 | 220 ms | 223 ms | 4.7 ms |
+| UnoCSS 66 | 4.7 | 33.6 | 28.9 | 67.2 | 2,676 | 678 ms | 658 ms | 4.1 ms |
+| Panda CSS 2.6 | 3.7 | 39.0 | 32.2 | 74.8 | 469 | 164 ms | 160 ms | 28.9 ms |
+| Tailwind CSS + tailwind-merge | 3.9 | 43.0 | 32.0 | 78.9 | 1,545 | 225 ms | 221 ms | 7.7 ms |
+| StyleX 0.19 | 7.1 | 49.6 | 31.7 | 88.3 | 1,161 | 22,043 ms | 22,148 ms | 3.5 ms |
+
+- **Bytes.** Compiled with `fuse: 'exact'`, Purser sends 18% less than Tailwind CSS and 12% less than vanilla-extract, the smallest of the others; with `fuse: 'max'` 28% and 22% less. The same order holds for 100 and for 2,000 components against the atomic tools; vanilla-extract is a few percent smaller than `exact` on the smallest corpus and on the stress corpus, and `max` stops paying at 2,000 components, where its stylesheet has grown past what it saves.
+- **Where Purser is not first.** Its stylesheet alone is larger than Tailwind's or Panda's: it carries the conditions that keep rules from overlapping. A build from nothing takes four times as long as Tailwind's, because Purser parses every module with the TypeScript parser and evaluates its styles; that is what lets it prove its rules and compile the modules. A build with nothing changed is the fastest of all, and with one file changed (415 ms) it is behind Tailwind and Panda.
+- **Nothing overridden.** Every other tool leaves hundreds of declarations on the page that are matched and then lose.
+
+Method, every number, the other corpus sizes and what to keep in mind when reading them: [`docs/benchmarks.md`](docs/benchmarks.md). The suite is in [`benchmarks/`](benchmarks/README.md) and runs with `npm run bench`.
+
 ## The guarantees
 
 1. **No declaration is ever overridden on the element it applies to.** Nothing is struck through in DevTools, in any state (hover, focus, attributes) and at any viewport width. Each build proves this by brute force, and a Chrome test checks it in a real browser.
 2. **No `!important`**, anywhere.
 3. **Every colour is a token.** A raw colour in a component style is a type error *and* a build error.
 4. **Every colour in the output is `lab()`.** Conversion is exact (CSS Color 4 math, D50).
-5. **Each declaration is written once.** Identical definitions share a class, output is deterministic, and class names are short stable hashes.
+5. **Each declaration is written once.** Identical definitions share a class, output is deterministic, and class names are short stable hashes (or, with the compiler, the shortest names there are, given by the build).
 6. **One generated stylesheet**, in three cascade layers: `purser.tokens`, `purser.globals`, `purser.atoms`, plus `purser.overrides` for a project still moving from existing CSS.
 
 ## API
@@ -249,7 +313,7 @@ A stage that finds a violation reports it as `file:line:column: error: message` 
 | `css.props(...styles)` | Merges styles left to right (later wins per property; falsy values ignored) and returns the class string. |
 | `css.keyframes(frames)` | Declares keyframes; returns the generated animation name. |
 | `css.globals(rules, options?)` | Rules that cannot be classes: `:root`, `html`, `body`, a minimal reset, `::selection`, `@font-face`. |
-| `createCss({ prefix, salt })` | A `css` with custom naming (pass the same `--prefix` and `--salt` to the build). |
+| `createCss({ prefix, salt, names })` | A `css` with custom naming (pass the same `--prefix`, `--salt` and `--names` to the build). |
 
 Conditions on a value: pseudo-classes and attribute selectors (`:hover`, `:focus-visible`, `[aria-expanded="true"]`, `:is(.dark *)`), plus `@media`, `@supports` and `@container`. They can nest. `default` is the fallback, and a later key wins when several are true. `null` leaves the property unset.
 
@@ -282,6 +346,13 @@ The `purser` command ships in `@avonao/purser`.
 | `--watch` | Rebuild on change (`build` only) |
 | `--prefix <name>` | Class name prefix (default `x`); must match `createCss({ prefix })` |
 | `--salt <text>` | Hash salt (default empty); must match `createCss({ salt })` |
+| `--names <mode>` | `legacy` (default: `x` + 7 characters), `short` (4 characters) or `min` (the shortest there are; the modules must be compiled) |
+| `--names-file <file>` | With `--names min`: a JSON file that keeps the names between builds |
+| `--granularity <g>` | `property` (default) or `rule`: one class per rule, so styles share the rules they have in common |
+| `--minify` | Write the stylesheet without whitespace and merge rules that write the same declaration |
+| `--fuse <level>` | With `--names min`: `exact`, `balanced` or `max`; classes that are applied together become one class (not with `--watch`) |
+| `--no-cache` | Parse every file again instead of using `node_modules/.cache/purser` |
+| `--find-salt` | Try salts until no two class names collide and print the one to use |
 | `--package <name>` | Runtime import specifier (default `@avonao/purser`) |
 | `--css-module <file>` | Module exporting a custom `css = createCss({ prefix, salt })` |
 | `--layers <t,g,a>` | Names of the tokens, globals and atoms cascade layers (a fourth name adds the overrides layer) |
@@ -341,16 +412,20 @@ Page-wide rules that must keep winning over old CSS (a high-contrast or reduced-
 
 ## Packages
 
-One package, three entry points and one script.
+One package, its entry points and one script.
 
-| Entry point | Purpose | Node |
+| Entry point | Purpose | Runs in |
 | --- | --- | --- |
-| [`@avonao/purser`](src/index.js) | Runtime and TypeScript declarations: `defineTokens`, `css.create`, `css.props`, `css.keyframes`, `css.globals`, `createCss` | ≥ 22 |
-| [`@avonao/purser/build`](src/build/index.js) | Build API: `build`, `check`, `watch`, `createBuilder` | ≥ 22 |
-| [`purser`](bin/purser.js) | The command line (`build`, `check`) | ≥ 22 |
+| [`@avonao/purser`](src/index.js) | Runtime and TypeScript declarations: `defineTokens`, `css.create`, `css.props`, `css.keyframes`, `css.globals`, `createCss` | Node ≥ 22, browsers |
+| [`@avonao/purser/rule`](src/rule.js) | The same runtime with one class per rule (`granularity: 'rule'` without the compiler) | Node ≥ 22, browsers |
+| [`@avonao/purser/compiled`](src/compiled.js) | What a compiled module imports when a merge is left for run time: `props`, `styles` | Node ≥ 22, browsers |
+| [`@avonao/purser/build`](src/build/index.js) | Build API: `build`, `check`, `watch`, `createBuilder` | Node ≥ 22 |
+| [`@avonao/purser/compiler`](src/compiler/index.js) | The compiler API: `createCompiler().transform(code, file)` | Node ≥ 22 |
+| [`@avonao/purser/vite`](src/plugins/vite.js), `/rollup`, [`/esbuild`](src/plugins/esbuild.js), [`/webpack`](src/plugins/webpack.js), [`/webpack-loader`](src/plugins/webpack-loader.cjs) | The compiler as a bundler plugin (the loader also serves Rspack and Turbopack) | Node ≥ 22 |
+| [`purser`](bin/purser.js) | The command line (`build`, `check`) | Node ≥ 22 |
 | [`scripts/strike-count.js`](scripts/strike-count.js) | An in-page counter of overridden declarations, for any page | a browser |
 
-Peer dependencies: `typescript` ≥ 5.0 (the build parses your source with it) and `postcss` ≥ 8.4 (optional; the output self-check).
+Dependency: `typescript` 5 or 6, for the parser (a project's own TypeScript 5 or 6 is used instead when it has one). Optional peer dependency: `postcss` ≥ 8.4, for the output self-check.
 
 ### Verifying a page
 
@@ -374,9 +449,9 @@ Hypdriv needs `@avonao/purser` 0.1 or later, installed separately. Purser works 
 
 | | Status |
 | --- | --- |
-| Release | 0.1.0 Preview |
+| Release | 0.2.0 Preview |
 | Implemented | Everything in this README |
-| Tests | 88 tests in 14 files on Node 22 and 24, including a headless-Chrome integration test |
+| Tests | 156 tests in 21 files on Node 22 and 24, including headless-Chrome tests that compare the computed styles of a page in every state across all output modes |
 | In use | The Entpoind Tools site (moving onto it component by component) and Hypdriv's `with-purser` examples |
 | API stability | Not yet guaranteed. 1.0 will commit to the style and token APIs and to class names, under semver |
 | Distribution | Source and a packed tarball |
@@ -390,12 +465,14 @@ Hypdriv needs `@avonao/purser` 0.1 or later, installed separately. Purser works 
 - **Logical and physical properties** (`marginTop` and `marginBlockStart`) are treated as conflicting. The block axis assumes horizontal writing modes. `inlineStart` and `inlineEnd` are direction-agnostic, so they replace both `left` and `right`.
 - **Only Purser's stylesheet is covered.** Third-party CSS on the same elements can still override, and so can the browser's own user-agent styles; DevTools does not strike those.
 - **The tokens module** must be JavaScript or TypeScript with erasable syntax only (Node strips the types). It is loaded with `import()` at build time.
-- **No bundler plugin yet.** Integrate with the CLI or the `@avonao/purser/build` API.
+- **The compiler folds what it can see.** A `css.props` call is turned into a string when its arguments are styles of a `css.create` in the same file, combined with `&&`, `?:` and arrays, with at most six guards. Anything else (a style passed in as a prop, an imported style, a computed key) is merged at run time by a helper of about 0.7 kB.
+- **Minimal names and fused classes need the compiler everywhere.** With `names: 'min'` every module with styles must be compiled, and with `fuse` every such module must be in the build's `src`. Dev servers and watching builds do not fuse.
+- **Next.js with the compiler** uses the webpack plugin or the loader beside `purser build`. The loader is exercised by production builds of Next.js 16.4, with Turbopack and with webpack, using minimal names and fused classes, set up by Hypdriv (its example `with-purser`): prerendered pages carry the build's names, and on the Workers runtime locally the zero-override audit finds nothing struck at three widths, three states and three themes. `PurserWebpackPlugin` has been tested against webpack's hook contract, not in a Next.js build, and nothing of this on a live deployment yet.
 - **Class names are public.** A change to the hash or to normalisation that renames classes is a breaking change and is recorded in the [changelog](CHANGELOG.md).
 
 ## Documentation
 
-- **Concepts:** [How Purser works](docs/how-it-works.md) · [Changelog](CHANGELOG.md)
+- **Concepts:** [How Purser works](docs/how-it-works.md) · [The compiler](docs/compiler.md) · [Benchmarks](docs/benchmarks.md) · [Changelog](CHANGELOG.md)
 - **Reference:** [API](docs/api.md) (`defineTokens`, `css.*`, `createCss`, the build API, the CLI, `strike-count.js`)
 - **Frameworks:** [Next.js](docs/nextjs.md)
 - **Sister products:** [Hypdriv](https://github.com/avonao/hypdriv) · [SquawkCode](https://github.com/avonao/squawkcode)
@@ -406,6 +483,7 @@ Hypdriv needs `@avonao/purser` 0.1 or later, installed separately. Purser works 
 npm install                 # typescript and postcss, for the build and the tests
 npm test                    # node --test (the Chrome test runs when Chrome is installed)
 npm run test:update         # regenerate the golden files; review the diff
+npm run bench               # the benchmark suite (cd benchmarks && npm install first)
 ```
 
 Continuous integration runs the suite on Node 22 and 24. The ground rules (keep the guarantees, keep the runtime small, treat class names as public) are in [`CONTRIBUTING.md`](CONTRIBUTING.md).

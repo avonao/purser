@@ -1,0 +1,487 @@
+{
+  "date": "2026-11-25",
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor",
+    "cores": 2,
+    "node": "v22.23.4",
+    "platform": "linux x64"
+  },
+  "corpus": {
+    "model": "interface",
+    "components": 100,
+    "styles": 355,
+    "declarations": 2789,
+    "pageElements": 2000,
+    "runs": 5
+  },
+  "results": [
+    {
+      "id": "purser-exact",
+      "label": "Purser (compiled, fuse: exact)",
+      "note": "the production setup: modules compiled, names given by the build, classes that always appear together fused",
+      "build": {
+        "coldMs": 387,
+        "warmMs": 47,
+        "changedMs": 211
+      },
+      "css": {
+        "raw": 29443,
+        "bytes": 28181,
+        "gzip": 4668,
+        "brotli": 4014,
+        "rules": 539
+      },
+      "js": {
+        "bytes": 19748,
+        "gzip": 6144,
+        "brotli": 5277
+      },
+      "runtime": {
+        "loadMs": 0.73,
+        "classNamesPerSec": 6662463
+      },
+      "html": {
+        "classBytes": 109424,
+        "perElement": 54.7,
+        "classesPerElement": 15.8,
+        "bytes": 159429,
+        "gzip": 15039,
+        "brotli": 10419
+      },
+      "total": {
+        "gzip": 25851,
+        "brotli": 19710
+      },
+      "struck": {
+        "count": 0,
+        "rules": 354,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "purser-max",
+      "label": "Purser (compiled, fuse: max)",
+      "note": "as above, with one class for every group of classes a css.props call applies",
+      "build": {
+        "coldMs": 406,
+        "warmMs": 50,
+        "changedMs": 246
+      },
+      "css": {
+        "raw": 43599,
+        "bytes": 42099,
+        "gzip": 8801,
+        "brotli": 7299,
+        "rules": 539
+      },
+      "js": {
+        "bytes": 13569,
+        "gzip": 3186,
+        "brotli": 2522
+      },
+      "runtime": {
+        "loadMs": 0.92,
+        "classNamesPerSec": 6379006
+      },
+      "html": {
+        "classBytes": 26934,
+        "perElement": 13.5,
+        "classesPerElement": 3.8,
+        "bytes": 76939,
+        "gzip": 8451,
+        "brotli": 7179
+      },
+      "total": {
+        "gzip": 20438,
+        "brotli": 17000
+      },
+      "struck": {
+        "count": 0,
+        "rules": 354,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "purser-min",
+      "label": "Purser (compiled, not fused)",
+      "note": "modules compiled, names given by the build, one class per rule",
+      "build": {
+        "coldMs": 357,
+        "warmMs": 50,
+        "changedMs": 221
+      },
+      "css": {
+        "raw": 31031,
+        "bytes": 30865,
+        "gzip": 5714,
+        "brotli": 4861,
+        "rules": 764
+      },
+      "js": {
+        "bytes": 25452,
+        "gzip": 7827,
+        "brotli": 6681
+      },
+      "runtime": {
+        "loadMs": 0.88,
+        "classNamesPerSec": 6484272
+      },
+      "html": {
+        "classBytes": 185631,
+        "perElement": 92.8,
+        "classesPerElement": 26.2,
+        "bytes": 235636,
+        "gzip": 22035,
+        "brotli": 12223
+      },
+      "total": {
+        "gzip": 35576,
+        "brotli": 23765
+      },
+      "struck": {
+        "count": 0,
+        "rules": 503,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "purser",
+      "label": "Purser (runtime only)",
+      "note": "no compiler: css.create runs in the browser, one class per property, hashed names (the 0.1 defaults)",
+      "build": {
+        "coldMs": 321,
+        "warmMs": 44,
+        "changedMs": 188
+      },
+      "css": {
+        "raw": 74134,
+        "bytes": 57477,
+        "gzip": 11010,
+        "brotli": 9300,
+        "rules": 1318
+      },
+      "js": {
+        "bytes": 97844,
+        "gzip": 17976,
+        "brotli": 15065
+      },
+      "runtime": {
+        "loadMs": 27.23,
+        "classNamesPerSec": 202875
+      },
+      "html": {
+        "classBytes": 368836,
+        "perElement": 184.4,
+        "classesPerElement": 20.6,
+        "bytes": 418841,
+        "gzip": 45031,
+        "brotli": 17115
+      },
+      "total": {
+        "gzip": 74017,
+        "brotli": 41480
+      },
+      "struck": {
+        "count": 0,
+        "rules": 916,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "stylex",
+      "label": "StyleX",
+      "build": {
+        "coldMs": 4559,
+        "warmMs": 4581,
+        "changedMs": 4664
+      },
+      "css": {
+        "raw": 23552,
+        "bytes": 18015,
+        "gzip": 4724,
+        "brotli": 4175,
+        "rules": 442
+      },
+      "js": {
+        "bytes": 110296,
+        "gzip": 13433,
+        "brotli": 11382
+      },
+      "runtime": {
+        "loadMs": 0.98,
+        "classNamesPerSec": 3485312
+      },
+      "html": {
+        "classBytes": 279298,
+        "perElement": 139.6,
+        "classesPerElement": 16.6,
+        "bytes": 329303,
+        "gzip": 33698,
+        "brotli": 15294
+      },
+      "total": {
+        "gzip": 51855,
+        "brotli": 30851
+      },
+      "struck": {
+        "count": 1098,
+        "rules": 426,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "row-gap <- .xcusyza | .xbvtmzp.xbvtmzp",
+          "column-gap <- .xcusyza | .xbvtmzp.xbvtmzp",
+          "padding-top <- .xlfww5h | .x1ms5z6y.x1ms5z6y"
+        ]
+      }
+    },
+    {
+      "id": "tailwind",
+      "label": "Tailwind CSS",
+      "build": {
+        "coldMs": 195,
+        "warmMs": 187,
+        "changedMs": 191
+      },
+      "css": {
+        "raw": 27813,
+        "bytes": 20184,
+        "gzip": 3698,
+        "brotli": 2888,
+        "rules": 436
+      },
+      "js": {
+        "bytes": 43772,
+        "gzip": 9334,
+        "brotli": 7917
+      },
+      "runtime": {
+        "loadMs": 1.11,
+        "classNamesPerSec": 7848341
+      },
+      "html": {
+        "classBytes": 419102,
+        "perElement": 209.6,
+        "classesPerElement": 19.3,
+        "bytes": 469107,
+        "gzip": 34596,
+        "brotli": 14815
+      },
+      "total": {
+        "gzip": 47628,
+        "brotli": 25620
+      },
+      "struck": {
+        "count": 1958,
+        "rules": 414,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "align-items <- .items-center | .items-stretch | .md\\:items-center | .md\\:items-stretch",
+          "justify-content <- .justify-between | .md\\:justify-start",
+          "row-gap <- .gap-3 | .md\\:gap-16"
+        ]
+      }
+    },
+    {
+      "id": "tailwind-merge",
+      "label": "Tailwind CSS + tailwind-merge",
+      "build": {
+        "coldMs": 184,
+        "warmMs": 192,
+        "changedMs": 198
+      },
+      "css": {
+        "raw": 27813,
+        "bytes": 20184,
+        "gzip": 3698,
+        "brotli": 2888,
+        "rules": 436
+      },
+      "js": {
+        "bytes": 74697,
+        "gzip": 19056,
+        "brotli": 15897
+      },
+      "runtime": {
+        "loadMs": 3,
+        "classNamesPerSec": 777445
+      },
+      "html": {
+        "classBytes": 377678,
+        "perElement": 188.8,
+        "classesPerElement": 17.1,
+        "bytes": 427683,
+        "gzip": 37232,
+        "brotli": 15699
+      },
+      "total": {
+        "gzip": 59986,
+        "brotli": 34484
+      },
+      "struck": {
+        "count": 1516,
+        "rules": 414,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "align-items <- .items-stretch | .md\\:items-center",
+          "justify-content <- .justify-between | .md\\:justify-start",
+          "row-gap <- .gap-3 | .md\\:gap-16"
+        ]
+      }
+    },
+    {
+      "id": "unocss",
+      "label": "UnoCSS",
+      "build": {
+        "coldMs": 440,
+        "warmMs": 430,
+        "changedMs": 427
+      },
+      "css": {
+        "raw": 37375,
+        "bytes": 35995,
+        "gzip": 4335,
+        "brotli": 3349,
+        "rules": 506
+      },
+      "js": {
+        "bytes": 43772,
+        "gzip": 9334,
+        "brotli": 7917
+      },
+      "runtime": {
+        "loadMs": 1.07,
+        "classNamesPerSec": 6160191
+      },
+      "html": {
+        "classBytes": 419102,
+        "perElement": 209.6,
+        "classesPerElement": 19.3,
+        "bytes": 469107,
+        "gzip": 34596,
+        "brotli": 14815
+      },
+      "total": {
+        "gzip": 48265,
+        "brotli": 26081
+      },
+      "struck": {
+        "count": 2693,
+        "rules": 501,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "font-size <- .text-lg | .md\\:text-xl",
+          "line-height <- .text-lg | .md\\:text-xl",
+          "color <- .text-accent | .text-accent"
+        ]
+      }
+    },
+    {
+      "id": "panda",
+      "label": "Panda CSS",
+      "build": {
+        "coldMs": 124,
+        "warmMs": 120,
+        "changedMs": 119
+      },
+      "css": {
+        "raw": 24917,
+        "bytes": 17526,
+        "gzip": 3283,
+        "brotli": 2598,
+        "rules": 435
+      },
+      "js": {
+        "bytes": 72562,
+        "gzip": 13322,
+        "brotli": 11190
+      },
+      "runtime": {
+        "loadMs": 7.16,
+        "classNamesPerSec": 95099
+      },
+      "html": {
+        "classBytes": 591585,
+        "perElement": 295.8,
+        "classesPerElement": 16.7,
+        "bytes": 641590,
+        "gzip": 45265,
+        "brotli": 17013
+      },
+      "total": {
+        "gzip": 61870,
+        "brotli": 30801
+      },
+      "struck": {
+        "count": 416,
+        "rules": 433,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "justify-content <- .justify-content_flex-start | .md\\:justify-content_space-between | .lg\\:justify-content_space-between",
+          "justify-content <- .justify-content_flex-start | .md\\:justify-content_space-between | .lg\\:justify-content_space-between",
+          "justify-content <- .justify-content_flex-start | .md\\:justify-content_space-between | .lg\\:justify-content_space-between"
+        ]
+      }
+    },
+    {
+      "id": "vanilla-extract",
+      "label": "vanilla-extract",
+      "build": {
+        "coldMs": 758,
+        "warmMs": 700,
+        "changedMs": 716
+      },
+      "css": {
+        "raw": 81328,
+        "bytes": 81161,
+        "gzip": 10616,
+        "brotli": 9582,
+        "rules": 867
+      },
+      "js": {
+        "bytes": 12717,
+        "gzip": 3791,
+        "brotli": 2567
+      },
+      "runtime": {
+        "loadMs": 1.27,
+        "classNamesPerSec": 6720865
+      },
+      "html": {
+        "classBytes": 32621,
+        "perElement": 16.3,
+        "classesPerElement": 1.9,
+        "bytes": 82626,
+        "gzip": 7169,
+        "brotli": 6319
+      },
+      "total": {
+        "gzip": 21576,
+        "brotli": 18468
+      },
+      "struck": {
+        "count": 1824,
+        "rules": 867,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "padding-top <- .f2fj5f0 | .f2fj5f0",
+          "padding-bottom <- .f2fj5f0 | .f2fj5f0",
+          "padding-left <- .f2fj5f0 | .f2fj5f0"
+        ]
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "name": "@avonao/purser",
-  "version": "0.1.0",
-  "description": "Purser CSS: compile-time atomic CSS where overrides, !important and raw colours are impossible.",
+  "version": "0.2.0",
+  "description": "Purser CSS: compile-time atomic CSS where overrides, !important and raw colours are impossible, compiled to class names with no style code left in the browser.",
   "license": "MIT",
   "author": "Avonao",
   "homepage": "https://pursercss.dev",
@@ -25,10 +25,39 @@
       "types": "./types/index.d.ts",
       "default": "./src/index.js"
     },
+    "./rule": {
+      "types": "./types/index.d.ts",
+      "default": "./src/rule.js"
+    },
     "./build": {
       "types": "./types/build.d.ts",
       "default": "./src/build/index.js"
     },
+    "./compiled": {
+      "types": "./types/compiled.d.ts",
+      "default": "./src/compiled.js"
+    },
+    "./compiler": {
+      "types": "./types/compiler.d.ts",
+      "default": "./src/compiler/index.js"
+    },
+    "./esbuild": {
+      "types": "./types/plugins.d.ts",
+      "default": "./src/plugins/esbuild.js"
+    },
+    "./vite": {
+      "types": "./types/plugins.d.ts",
+      "default": "./src/plugins/vite.js"
+    },
+    "./rollup": {
+      "types": "./types/plugins.d.ts",
+      "default": "./src/plugins/vite.js"
+    },
+    "./webpack": {
+      "types": "./types/plugins.d.ts",
+      "default": "./src/plugins/webpack.js"
+    },
+    "./webpack-loader": "./src/plugins/webpack-loader.cjs",
     "./package.json": "./package.json"
   },
   "types": "./types/index.d.ts",
@@ -49,23 +78,23 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\"",
-    "test:update": "UPDATE_GOLDEN=1 node --test --test-concurrency=1 \"tests/**/*.test.js\""
+    "test": "node --import ./tests/helpers/env.js --test --test-concurrency=1 \"tests/**/*.test.js\" && node --import ./tests/helpers/env.js --test tests/short/*.test.js",
+    "test:update": "UPDATE_GOLDEN=1 node --import ./tests/helpers/env.js --test --test-concurrency=1 \"tests/**/*.test.js\"",
+    "bench": "npm --prefix benchmarks run bench"
+  },
+  "dependencies": {
+    "typescript": ">=5.0.0 <7.0.0"
   },
   "peerDependencies": {
-    "postcss": ">=8.4",
-    "typescript": ">=5.0"
+    "postcss": ">=8.4"
   },
   "peerDependenciesMeta": {
     "postcss": {
       "optional": true
-    },
-    "typescript": {
-      "optional": true
     }
   },
   "devDependencies": {
-    "postcss": "^8.5.6",
-    "typescript": "^5.9.3"
+    "esbuild": "^0.28.2",
+    "postcss": "^8.5.6"
   }
 }

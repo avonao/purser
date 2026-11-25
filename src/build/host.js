@@ -10,13 +10,29 @@ export function hostRequire(projectDir) {
   return createRequire(path.join(path.resolve(projectDir), 'package.json'));
 }
 
-/** Load the project's `typescript`, or throw a clear error. */
+const ownRequire = createRequire(import.meta.url);
+
+/** Does this `typescript` module have the parser API? TypeScript 7 (the native compiler) exports only its version. */
+const hasParser = (ts) => Boolean(ts) && typeof ts.createSourceFile === 'function' && typeof ts.forEachChild === 'function';
+
+/**
+ * The TypeScript that parses source files: the project's own when it has the JavaScript parser API (TypeScript 5 and
+ * 6), otherwise the copy Purser depends on. A project on TypeScript 7, or without TypeScript at all, builds with that copy.
+ * @param {string} projectDir
+ */
 export function loadTypeScript(projectDir) {
-  try {
-    return hostRequire(projectDir)('typescript');
-  } catch {
-    throw new Error(`purser: the build needs the "typescript" package installed in ${projectDir} (it parses your source files)`);
+  for (const load of [() => hostRequire(projectDir)('typescript'), () => ownRequire('typescript')]) {
+    try {
+      const ts = load();
+      if (hasParser(ts)) return ts;
+    } catch {
+      // not installed there: try the next place
+    }
   }
+  throw new Error(
+    `purser: no TypeScript with a parser API was found for ${projectDir} (the build parses your source files with it). ` +
+      'Install typescript 5 or 6 next to @avonao/purser: npm install --save-dev "typescript@<7".',
+  );
 }
 
 /** Load the project's `postcss`, or null when it is not installed. */

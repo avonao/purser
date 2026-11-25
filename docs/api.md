@@ -123,7 +123,7 @@ Components then `import { css } from '@/lib/css'`.
 build(options: BuildOptions): Promise<BuildResult>
 check(options: Omit<BuildOptions, 'out'>): Promise<BuildResult>
 watch(options: BuildOptions, onResult: (r: BuildResult) => void): Promise<{ close(): void }>
-createBuilder(options: BuildOptions): { run(): Promise<BuildResult>, … }
+createBuilder(options: BuildOptions): { run(): Promise<BuildResult>, record(file, hash), registry, … }
 
 interface BuildOptions {
   projectDir: string;   // typescript and postcss resolve from here
@@ -132,6 +132,13 @@ interface BuildOptions {
   out?: string;         // output file; written only when its content changes
   prefix?: string;      // default "x"
   salt?: string;        // default ""
+  names?: 'legacy' | 'short' | 'min';        // see "Class names"
+  granularity?: 'property' | 'rule';         // one class per property of a style (default) or per rule
+  minify?: boolean;     // no whitespace, rules with the same declaration merged
+  fuse?: false | 'exact' | 'balanced' | 'max'; // with names "min": one class for classes applied together
+  namesFile?: string;   // with names "min": keeps the names between builds
+  cache?: boolean | string; // false: no cache on disk; a string: its directory
+  threads?: number;     // worker threads (default: from four processors on)
   packageName?: string; // default "@avonao/purser"
   cssModule?: string;   // module exporting a custom css = createCss({ … })
   layers?: { tokens?: string; globals?: string; overrides?: string; atoms?: string }; // cascade layer names
@@ -140,27 +147,54 @@ interface BuildOptions {
 interface BuildResult {
   css: string | null;   // null when there are errors
   diagnostics: { severity: 'error' | 'warning'; message: string; file?: string; line?: number; column?: number }[];
-  stats: { files; atoms; rules; keyframes; tokens } | null;
+  stats: { files; atoms; rules; keyframes; tokens; fused? } | null;
   written: boolean;
   outFile: string | null;
+  names: Record<string, string> | null; // with names "min": the name of every class
 }
 ```
 
 The build scans `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.mts`, `.cts` and `.cjs` files, skipping `node_modules`, dot-directories and build output folders. It parses only files that mention the package name. Imports resolve with the project's `tsconfig.json` (`paths` aliases work).
+
+It parses with the project's TypeScript when that has the parser API (TypeScript 5 and 6), and with the copy Purser depends on otherwise (a project on TypeScript 7, or without TypeScript).
+
+**The cache.** What each file's `css.*` calls evaluate to is kept in `node_modules/.cache/purser` by the file's content, so a file that has not changed is not parsed again and a build in which none has changed does not load the parser. `build()` also leaves a record of what it read and wrote; while no source file, the tokens module, `tsconfig.json` or an option changes and the stylesheet stays what it wrote, the next `build()` returns that result (`written: false`) without doing the work. `cache: false`, `--no-cache` or `PURSER_CACHE=0` turn both off; deleting the directory is always safe. A project without a `node_modules` directory of its own (a package of a workspace that keeps its dependencies at the root, Yarn Plug'n'Play) uses the nearest `node_modules` further up, in a directory named after the project's path, and without any the user's cache directory (`$XDG_CACHE_HOME/purser`, `~/.cache/purser`, `~/Library/Caches/purser`, `%LOCALAPPDATA%\purser\Cache`). The cache holds what modules compile to, so it is never kept in the shared temporary directory, where another user of the machine could prepare one.
+
+`names: 'min'`, `granularity: 'rule'`, `minify` and `fuse`, and the entries that compile modules (`@avonao/purser/compiler`, `/vite`, `/rollup`, `/esbuild`, `/webpack`, `/webpack-loader`), are described in [The compiler](compiler.md).
 
 ## CLI
 
 ```
 purser build --project <dir> --src <dirs> --tokens <file> --out <file> [--watch]
 purser check --project <dir> --src <dirs> --tokens <file>
-  [--prefix <name>] [--salt <text>] [--package <name>] [--css-module <file>]
+  [--prefix <name>] [--salt <text>] [--names legacy|short|min] [--names-file <file>]
+  [--granularity property|rule] [--minify] [--fuse exact|balanced|max] [--no-cache] [--find-salt]
+  [--package <name>] [--css-module <file>]
   [--layers <tokens>,<globals>[,<overrides>],<atoms>]
 ```
 
 `--layers` (and the `layers` build option) names the cascade layers. The defaults are `purser.tokens`, `purser.globals`, `purser.overrides` and `purser.atoms`, which are sublayers of one `purser` layer and therefore sit together in the cascade. The overrides layer is written only when a `css.globals` call asks for it; three names leave it at its default. Give them top-level names when Purser joins an existing stylesheet; see [Adopting Purser next to existing CSS](nextjs.md#adopting-purser-next-to-existing-css).
+
+`--names min`, `--names-file`, `--granularity`, `--minify` and `--fuse` shape the output for compiled modules; see [The compiler](compiler.md#smaller-output). `--fuse` is not used with `--watch`.
+
+`purser build` prints `wrote <file>` when the stylesheet changed and `unchanged <file>` when it did not.
 
 Exit codes: `0` for success, `1` for rule violations or errors (each printed as `file:line:column: error: message`), and `2` for usage errors.
 
 ## `scripts/strike-count.js`
 
 An in-page script. Evaluating it returns `{ count, struck: [{ element, pseudo, property, sources }], rules, skipped }` for the page's current state. It also defines `globalThis.purserStrikeCount()` so you can call it again after changing hover, focus or width. `@container` rules are reported in `skipped`, because they cannot be evaluated from script.
+
+## Class names
+
+Three kinds, chosen with `names` (the build option and `createCss({ names })`), `--names` or `PURSER_NAMES`:
+
+| `names` | A name | Who computes it |
+| --- | --- | --- |
+| `'legacy'` (default) | `x` + 7 characters, a hash of what the class does | The runtime and the build, each on its own |
+| `'short'` | 4 characters: a letter, then three from `A-Za-z0-9_-` (about 13.6 million names) | The runtime and the build, each on its own |
+| `'min'` | `_a`, `_b`, … the shortest there are, the most used class first | The build alone, so every module must be compiled ([The compiler](compiler.md)) |
+
+The build refuses two classes with the same hashed name. When it does, run `purser build ... --find-salt`: it tries salts (`""`, `s1`, `s2`, ...) until none collides and prints `PURSER_SALT=<salt>`. Give the same salt to the build and to the runtime: `createCss({ salt })`, or, for the default `css`, set `PURSER_SALT` in the environment of the build and of the server, and for the browser bundle let the bundler inline it (Next.js: `env: { PURSER_SALT: "<salt>" }` in `next.config`). Changing the salt renames every class, so regenerate the stylesheet and redeploy together.
+
+The long names stay the default until a project opts in: `PURSER_NAMES=short` in the environment of the build and, inlined, of the browser bundle (Next.js `env`).

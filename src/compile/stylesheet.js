@@ -2,9 +2,12 @@
 
 import { flatten } from '../conditions.js';
 import { PurserError } from '../errors.js';
+import { planFusion, resolveFuse } from '../fuse.js';
 import { resolveNaming } from '../hash.js';
-import { atomClassName, canonical, keyframesCanonical, keyframesName, normalizeKeyframes, normalizeStyle } from '../normalize.js';
+import { createNameRegistry } from '../names.js';
+import { atomClassName, canonical, keyframesCanonical, keyframesName, normalizeKeyframes } from '../normalize.js';
 import { checkValue, leaves } from '../validate.js';
+import { normalizeNamedStyle } from '../build/memo.js';
 import { compileAtoms, cmp } from './atoms.js';
 import { compileGlobals } from './globals.js';
 import { layer, renderRules } from './render.js';
@@ -63,11 +66,22 @@ export function resolveLayers(layers = {}) {
 
 /**
  * Compile token definitions and extracted calls into CSS.
- * @param {{ tokens?: { axes?: object, tokens: object } | null, tokensFile?: string, calls: Call[], prefix?: string, salt?: string, layers?: { tokens?: string, globals?: string, overrides?: string, atoms?: string } }} input
- * @returns {{ css: string | null, diagnostics: Diagnostic[], stats: { atoms: number, rules: number, keyframes: number, tokens: number } }}
+ * @param {{ tokens?: { axes?: object, tokens: object } | null, tokensFile?: string, calls: Call[], prefix?: string, salt?: string, names?: 'short' | 'legacy' | 'min', granularity?: 'property' | 'rule', minify?: boolean, fuse?: false | 'exact' | 'balanced' | 'max', contexts?: { ids: string[], weight?: number }[], registry?: ReturnType<typeof createNameRegistry>, layers?: { tokens?: string, globals?: string, overrides?: string, atoms?: string } }} input
+ * @returns {{ css: string | null, diagnostics: Diagnostic[], stats: { atoms: number, rules: number, keyframes: number, tokens: number, fused?: object }, registry: ReturnType<typeof createNameRegistry> | null }}
+ *   registry: with names "min", the names given to the classes (input.registry when one was passed in)
+ *
+ * input.fuse with input.contexts (every group of classes the compiled modules apply whole, see ../fuse.js) fuses
+ * classes that are applied together; it needs names "min", because only the build knows the result.
  */
 export function compileStylesheet(input) {
-  const naming = resolveNaming({ prefix: input.prefix, salt: input.salt });
+  const requested = resolveNaming({ prefix: input.prefix, salt: input.salt, names: input.names, granularity: input.granularity });
+  const fuse = resolveFuse(input.fuse);
+  if (fuse && requested.names !== 'min') throw new TypeError('purser: fuse needs names "min" (fused classes are named by the build)');
+  if (fuse && !input.contexts) throw new TypeError('purser: fuse needs the classes the compiled modules apply (contexts)');
+  // Minimal names are given once every class and its number of uses is known, so everything is compiled under the
+  // legacy names (what the registry names) and renamed where a selector is written.
+  const registry = requested.names === 'min' ? (input.registry ?? createNameRegistry({ prefix: requested.minPrefix })) : null;
+  const naming = registry ? { ...requested, names: 'legacy' } : requested;
   const names = resolveLayers(input.layers);
   /** @type {Diagnostic[]} */
   const diagnostics = [];
@@ -96,10 +110,10 @@ export function compileStylesheet(input) {
     }
   };
 
-  // Atoms.
-  const atoms = new Map();
-  const atomCanon = new Map();
-  const atomCall = new Map();
+  // Atoms. One entry per distinct value tree of a property; `className` is the tree's own name (the class itself with
+  // property granularity, the marker of a style with a gap with rule granularity).
+  const atoms = new Map(); // canonical tree -> { className, entry, call }
+  const atomCanon = new Map(); // className -> canonical tree
   for (const call of input.calls.filter((c) => c.kind === 'create')) {
     const styles = call.value;
     if (!styles || typeof styles !== 'object' || Array.isArray(styles)) {
@@ -109,13 +123,19 @@ export function compileStylesheet(input) {
     for (const name of Object.keys(styles)) {
       let entries;
       try {
-        entries = normalizeStyle(styles[name], [name]);
+        entries = normalizeNamedStyle(styles[name], name);
       } catch (err) {
         report(err, call);
         continue;
       }
       for (const entry of entries.values()) {
         if (entry.tree === null) continue;
+        const canon = `${entry.pe}|${entry.prop}|${canonical(entry.tree)}`;
+        const known = atoms.get(canon);
+        if (known) {
+          known.uses++; // the same tree was checked where it first appeared
+          continue;
+        }
         let ok = true;
         for (const leaf of leaves(entry.tree, entry.path)) {
           for (const problem of checkValue(entry.prop, leaf.value, valueCtx)) {
@@ -131,25 +151,55 @@ export function compileStylesheet(input) {
         }
         if (!ok) continue;
         const className = atomClassName(entry, naming);
-        const canon = `${entry.pe}|${entry.prop}|${canonical(entry.tree)}`;
-        if (atomCanon.has(className)) {
-          if (atomCanon.get(className) !== canon) {
+        if (naming.granularity !== 'rule') {
+          // With rule granularity this name is only used for styles with a gap; compileAtoms checks those.
+          if (atomCanon.has(className)) {
             report(new PurserError(`class name collision on ${className}; set a different salt (css: createCss({ salt }), build: --salt)`, entry.path), call);
+            continue;
           }
-          continue;
+          atomCanon.set(className, canon);
         }
-        atomCanon.set(className, canon);
-        atoms.set(className, entry);
-        atomCall.set(className, call);
+        atoms.set(canon, { className, entry, call, uses: 1 });
       }
     }
   }
 
-  let atomResult = { rules: [], coverage: new Map() };
+  let atomResult = { rules: [], coverage: new Map(), classes: 0, ruleCount: 0, namesOf: (name) => [name] };
+  let fused;
   try {
-    atomResult = compileAtoms(atoms);
+    atomResult = compileAtoms([...atoms.values()], naming, {
+      group: input.minify === true,
+      finalize: registry
+        ? (uses) => {
+            if (!fuse) {
+              registry.assign(uses);
+              registry.setPlan(null);
+              return (name) => [registry.get(name)];
+            }
+            // Only classes this build compiled can be planned (a context may name one whose style had an error).
+            const plan = planFusion(
+              input.contexts.map((c) => ({ ...c, ids: c.ids.filter((id) => uses.has(id)) })),
+              { level: fuse },
+            );
+            registry.assign(plan.uses);
+            const memberOf = new Map(); // class id -> names of the fused classes it is part of
+            for (const [identity, ids] of plan.classes) {
+              const name = registry.get(identity);
+              for (const id of ids) {
+                const list = memberOf.get(id);
+                if (list) list.push(name);
+                else memberOf.set(id, [name]);
+              }
+            }
+            registry.setPlan({ level: fuse, covers: new Map([...plan.covers].map(([key, identities]) => [key, identities.map((identity) => registry.get(identity))])) });
+            fused = { level: fuse, ...plan.stats };
+            const none = [];
+            return (name) => memberOf.get(name) ?? none;
+          }
+        : undefined,
+    });
   } catch (err) {
-    report(err, findCallByPath(err, atoms, atomCall));
+    report(err, err.call ?? findCallByPath(err, atoms));
   }
 
   // Globals (after atoms: they exclude atom classes).
@@ -163,7 +213,7 @@ export function compileStylesheet(input) {
   globalCalls.sort((a, b) => (a.layer === b.layer ? 0 : a.layer === 'overrides' ? 1 : -1));
   let globals = { rules: [], fontFaces: [], items: [] };
   try {
-    globals = compileGlobals(globalCalls, atomResult.coverage);
+    globals = compileGlobals(globalCalls, atomResult.coverage, atomResult.namesOf);
   } catch (err) {
     report(err);
   }
@@ -207,37 +257,41 @@ export function compileStylesheet(input) {
     keyframes.set(name, { canon, frames });
   }
 
-  const stats = { atoms: atoms.size, rules: atomResult.rules.length, keyframes: keyframes.size, tokens: tokens.names.size };
-  if (diagnostics.some((d) => d.severity === 'error')) return { css: null, diagnostics, stats };
+  const stats = { atoms: atomResult.classes, rules: atomResult.ruleCount, keyframes: keyframes.size, tokens: tokens.names.size };
+  if (fused) stats.fused = fused;
+  if (diagnostics.some((d) => d.severity === 'error')) return { css: null, diagnostics, stats, registry };
 
   // Render.
+  const min = input.minify === true;
   let keyframesCss = '';
   for (const name of [...keyframes.keys()].sort(cmp)) {
     const { frames } = keyframes.get(name);
-    keyframesCss += `  @keyframes ${name} {\n`;
-    for (const f of frames) {
-      const decls = [...f.entries.values()].filter((e) => e.tree !== null);
-      keyframesCss += `    ${f.selector} {${decls.map((e) => ` ${e.prop}: ${e.tree};`).join('')} }\n`;
+    const blocks = frames.map((f) => ({ selector: f.selector, decls: [...f.entries.values()].filter((e) => e.tree !== null) }));
+    if (min) keyframesCss += `@keyframes ${name}{${blocks.map((f) => `${f.selector.replace(/, /g, ',')}{${f.decls.map((e) => `${e.prop}:${e.tree}`).join(';')}}`).join('')}}`;
+    else {
+      keyframesCss += `  @keyframes ${name} {\n`;
+      for (const f of blocks) keyframesCss += `    ${f.selector} {${f.decls.map((e) => ` ${e.prop}: ${e.tree};`).join('')} }\n`;
+      keyframesCss += '  }\n';
     }
-    keyframesCss += '  }\n';
   }
   let globalsCss = '';
   for (const face of globals.fontFaces) {
-    globalsCss += `  @font-face {\n${face.map(([p, v]) => `    ${p}: ${v};\n`).join('')}  }\n`;
+    globalsCss += min ? `@font-face{${face.map(([p, v]) => `${p}:${v}`).join(';')}}` : `  @font-face {\n${face.map(([p, v]) => `    ${p}: ${v};\n`).join('')}  }\n`;
   }
-  globalsCss += renderRules(globals.rules.filter((r) => r.layer === 'globals'), '  ');
-  const overridesCss = renderRules(globals.rules.filter((r) => r.layer === 'overrides'), '  ');
+  globalsCss += renderRules(globals.rules.filter((r) => r.layer === 'globals'), '  ', min);
+  const overridesCss = renderRules(globals.rules.filter((r) => r.layer === 'overrides'), '  ', min);
 
   const blocks = [
-    layer(names.tokens, renderRules(tokens.rules, '  ')),
-    layer(names.globals, globalsCss),
-    layer(names.overrides, overridesCss),
-    layer(names.atoms, renderRules(atomResult.rules, '  ') + keyframesCss),
+    layer(names.tokens, renderRules(tokens.rules, '  ', min), min),
+    layer(names.globals, globalsCss, min),
+    layer(names.overrides, overridesCss, min),
+    layer(names.atoms, renderRules(atomResult.rules, '  ', min) + keyframesCss, min),
   ].filter(Boolean);
   const order = overridesCss ? [names.tokens, names.globals, names.overrides, names.atoms] : [names.tokens, names.globals, names.atoms];
-  const statement = `@layer ${order.join(', ')};`;
-  const css = `/* Generated by purser. Do not edit. */\n${statement}\n${blocks.map((b) => `\n${b}`).join('')}`;
-  return { css, diagnostics, stats };
+  const css = min
+    ? `@layer ${order.join(',')};${blocks.join('')}\n`
+    : `/* Generated by purser. Do not edit. */\n@layer ${order.join(', ')};\n${blocks.map((b) => `\n${b}`).join('')}`;
+  return { css, diagnostics, stats, registry };
 }
 
 /**
@@ -255,7 +309,7 @@ function globalsLayer(options) {
   return l;
 }
 
-function findCallByPath(err, atoms, atomCall) {
-  for (const [cls, entry] of atoms) if (entry.path === err.path) return atomCall.get(cls);
+function findCallByPath(err, atoms) {
+  for (const atom of atoms.values()) if (atom.entry.path === err.path) return atom.call;
   return undefined;
 }

@@ -7,14 +7,23 @@ const ts = tryRequire('typescript');
 const skip = ts ? false : 'typescript is not installed in the host project';
 
 test('type declarations accept valid styles and reject raw colours, shorthands and typos', { skip }, () => {
-  const program = ts.createProgram([path.join(ROOT, 'tests/types/usage.ts')], {
+  const program = ts.createProgram([path.join(ROOT, 'tests/types/usage.ts'), path.join(ROOT, 'tests/types/tooling.ts')], {
     strict: true,
     noEmit: true,
     target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     types: [],
-    paths: { '@avonao/purser': [path.join(ROOT, 'types/index.d.ts')], '@avonao/purser/build': [path.join(ROOT, 'types/build.d.ts')] },
+    paths: {
+      '@avonao/purser': [path.join(ROOT, 'types/index.d.ts')],
+      '@avonao/purser/rule': [path.join(ROOT, 'types/index.d.ts')],
+      '@avonao/purser/build': [path.join(ROOT, 'types/build.d.ts')],
+      '@avonao/purser/compiler': [path.join(ROOT, 'types/compiler.d.ts')],
+      '@avonao/purser/compiled': [path.join(ROOT, 'types/compiled.d.ts')],
+      '@avonao/purser/vite': [path.join(ROOT, 'types/plugins.d.ts')],
+      '@avonao/purser/esbuild': [path.join(ROOT, 'types/plugins.d.ts')],
+      '@avonao/purser/webpack': [path.join(ROOT, 'types/plugins.d.ts')],
+    },
   });
   const diagnostics = ts.getPreEmitDiagnostics(program).map((d) => {
     const line = d.file ? d.file.getLineAndCharacterOfPosition(d.start).line + 1 : 0;

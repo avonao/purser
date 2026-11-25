@@ -4,9 +4,12 @@
 
 import { conflictsOf } from './conflicts.js';
 import { PurserError } from './errors.js';
-import { makeName } from './hash.js';
+import { makeName, makeStableName } from './hash.js';
 import { cssPropertyName, formatNumberValue } from './properties.js';
+import { mergeKey } from './props.js';
 import { expandProperty } from './shorthands.js';
+
+export { mergeKey };
 
 /** Is `key` a condition key (as opposed to a property or pseudo-element)? */
 export function conditionKind(key) {
@@ -150,11 +153,6 @@ export function normalizeStyle(style, path = [], opts = {}) {
   return out;
 }
 
-/** Key under which css.props merges a property ("color", "::before color"). */
-export function mergeKey(pe, prop) {
-  return pe ? `${pe} ${prop}` : prop;
-}
-
 /** Class name for an atomic entry. */
 export function atomClassName(entry, naming) {
   return makeName(`${entry.pe}|${entry.prop}|${canonical(entry.tree)}`, naming);
@@ -189,5 +187,5 @@ export function keyframesCanonical(frames) {
 
 /** Generated animation name for normalised keyframes. */
 export function keyframesName(frames, naming) {
-  return makeName(`@keyframes|${keyframesCanonical(frames)}`, naming);
+  return makeStableName(`@keyframes|${keyframesCanonical(frames)}`, naming);
 }
