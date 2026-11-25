@@ -18,7 +18,13 @@ Options:
   --watch            rebuild on change (build only)
   --prefix <name>    class name prefix (default "x"); must match createCss({ prefix })
   --salt <text>      hash salt (default: $PURSER_SALT, else ""); must match createCss({ salt })
-  --names <mode>     short (default, 4-character class names) or legacy (x + 7 characters); must match createCss({ names })
+  --names <mode>     legacy (default: x + 7 characters), short (4 characters) or min (the shortest there are, most used
+                     first; given by the build, so the modules must be compiled); must match createCss({ names })
+  --names-file <f>   with --names min: JSON file that keeps the names between builds
+  --granularity <g>  property (default: one class per property of a style) or rule (one class per rule, so styles share
+                     the rules they have in common and the stylesheet is smaller); must match createCss({ granularity })
+  --minify           write the stylesheet without whitespace and merge rules that write the same declaration
+  --no-cache         parse every file again instead of using node_modules/.cache/purser (also PURSER_CACHE=0)
   --find-salt        build only: try salts until the class names have no collision, print the one to use (PURSER_SALT), write nothing
   --package <name>   runtime import specifier (default "@avonao/purser")
   --css-module <f>   module exporting a custom css = createCss({ prefix, salt })
@@ -55,6 +61,10 @@ export async function main(argv, io = {}) {
         prefix: { type: 'string' },
         salt: { type: 'string' },
         names: { type: 'string' },
+        granularity: { type: 'string' },
+        'names-file': { type: 'string' },
+        minify: { type: 'boolean', default: false },
+        'no-cache': { type: 'boolean', default: false },
         'find-salt': { type: 'boolean', default: false },
         package: { type: 'string' },
         'css-module': { type: 'string' },
@@ -113,6 +123,10 @@ export async function main(argv, io = {}) {
     prefix: v.prefix,
     salt: v.salt,
     names: v.names,
+    granularity: v.granularity,
+    namesFile: v['names-file'],
+    minify: v.minify,
+    cache: v['no-cache'] ? false : undefined,
     packageName: v.package,
     cssModule: v['css-module'],
     layers,

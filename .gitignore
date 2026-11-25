@@ -11,3 +11,7 @@ coverage/
 *.log
 .idea/
 .vscode/
+
+# Benchmark work directories and test scratch projects
+benchmarks/.work/
+tests/.*-*/

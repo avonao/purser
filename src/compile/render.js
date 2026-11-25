@@ -11,9 +11,10 @@
 /**
  * @param {CssRule[]} rules
  * @param {string} indent
+ * @param {boolean} [minify] no whitespace: `.a,.b{color:red}`
  * @returns {string}
  */
-export function renderRules(rules, indent = '') {
+export function renderRules(rules, indent = '', minify = false) {
   const root = { rules: [], children: new Map() };
   for (const r of rules) {
     let node = root;
@@ -23,7 +24,14 @@ export function renderRules(rules, indent = '') {
     }
     node.rules.push(r);
   }
-  return renderNode(root, indent);
+  return minify ? compactNode(root) : renderNode(root, indent);
+}
+
+function compactNode(node) {
+  let out = '';
+  for (const r of node.rules) out += `${r.selectors.join(',')}{${r.decls.map(([p, v]) => `${p}:${v}`).join(';')}}`;
+  for (const [prelude, child] of node.children) out += `${prelude}{${compactNode(child)}}`;
+  return out;
 }
 
 function renderNode(node, indent) {
@@ -43,6 +51,7 @@ function renderRule(r, indent) {
 }
 
 /** Wrap rendered rules in a named layer block. */
-export function layer(name, body) {
-  return body ? `@layer ${name} {\n${body}}\n` : '';
+export function layer(name, body, minify = false) {
+  if (!body) return '';
+  return minify ? `@layer ${name}{${body}}` : `@layer ${name} {\n${body}}\n`;
 }
