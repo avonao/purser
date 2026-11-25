@@ -75,5 +75,10 @@ css.globals({
 });
 const custom = createCss({ prefix: 'p' });
 custom.props(custom.create({ a: { opacity: 1 } }).a);
+createCss({ names: 'short', salt: 's', granularity: 'rule' });
+// @ts-expect-error unknown naming mode
+createCss({ names: 'tiny' });
+// @ts-expect-error unknown granularity
+createCss({ granularity: 'atom' });
 
 void [text, brand, space, wrong, cls, fade];

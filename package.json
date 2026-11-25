@@ -25,6 +25,10 @@
       "types": "./types/index.d.ts",
       "default": "./src/index.js"
     },
+    "./rule": {
+      "types": "./types/index.d.ts",
+      "default": "./src/rule.js"
+    },
     "./build": {
       "types": "./types/build.d.ts",
       "default": "./src/build/index.js"

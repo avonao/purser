@@ -1,0 +1,424 @@
+{
+  "date": "2026-11-25",
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor",
+    "cores": 2,
+    "node": "v22.23.4",
+    "platform": "linux x64"
+  },
+  "corpus": {
+    "model": "uniform",
+    "components": 500,
+    "styles": 1750,
+    "declarations": 13558,
+    "pageElements": 2000,
+    "runs": 2
+  },
+  "results": [
+    {
+      "id": "purser-min",
+      "label": "Purser (compiled, minimal names)",
+      "note": "the production setup: rule granularity, minified stylesheet, names given by the build",
+      "build": {
+        "coldMs": 868,
+        "warmMs": 393
+      },
+      "css": {
+        "raw": 127995,
+        "bytes": 126271,
+        "gzip": 22543,
+        "brotli": 20187,
+        "rules": 1592
+      },
+      "js": {
+        "bytes": 155237,
+        "gzip": 41493,
+        "brotli": 34535
+      },
+      "runtime": {
+        "loadMs": 2.27,
+        "classNamesPerSec": 4148925
+      },
+      "html": {
+        "classBytes": 197162,
+        "perElement": 98.6,
+        "bytes": 247167,
+        "gzip": 56501,
+        "brotli": 29826
+      },
+      "total": {
+        "gzip": 120537,
+        "brotli": 84548
+      },
+      "struck": {
+        "count": 0,
+        "rules": 1083,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "purser-compiled",
+      "label": "Purser (compiled, hashed names)",
+      "note": "rule granularity and a minified stylesheet, with names that need no registry",
+      "build": {
+        "coldMs": 747,
+        "warmMs": 357
+      },
+      "css": {
+        "raw": 150543,
+        "bytes": 148819,
+        "gzip": 37768,
+        "brotli": 34268,
+        "rules": 1592
+      },
+      "js": {
+        "bytes": 267452,
+        "gzip": 80126,
+        "brotli": 59269
+      },
+      "runtime": {
+        "loadMs": 4.76,
+        "classNamesPerSec": 3965488
+      },
+      "html": {
+        "classBytes": 481516,
+        "perElement": 240.8,
+        "bytes": 531521,
+        "gzip": 142514,
+        "brotli": 53191
+      },
+      "total": {
+        "gzip": 260408,
+        "brotli": 146728
+      },
+      "struck": {
+        "count": 0,
+        "rules": 1083,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "purser",
+      "label": "Purser (runtime, 0.1 defaults)",
+      "note": "no compiler: css.create runs in the browser, one class per property",
+      "build": {
+        "coldMs": 830,
+        "warmMs": 398
+      },
+      "css": {
+        "raw": 426131,
+        "bytes": 342081,
+        "gzip": 55127,
+        "brotli": 44322,
+        "rules": 6354
+      },
+      "js": {
+        "bytes": 408367,
+        "gzip": 60758,
+        "brotli": 46460
+      },
+      "runtime": {
+        "loadMs": 116.26,
+        "classNamesPerSec": 200593
+      },
+      "html": {
+        "classBytes": 369160,
+        "perElement": 184.6,
+        "bytes": 419165,
+        "gzip": 84913,
+        "brotli": 39363
+      },
+      "total": {
+        "gzip": 200798,
+        "brotli": 130145
+      },
+      "struck": {
+        "count": 0,
+        "rules": 5230,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "stylex",
+      "label": "StyleX",
+      "build": {
+        "coldMs": 10435,
+        "warmMs": 10617
+      },
+      "css": {
+        "raw": 62311,
+        "bytes": 53524,
+        "gzip": 12635,
+        "brotli": 10755,
+        "rules": 1337
+      },
+      "js": {
+        "bytes": 535178,
+        "gzip": 65940,
+        "brotli": 51737
+      },
+      "runtime": {
+        "loadMs": 3.16,
+        "classNamesPerSec": 3277341
+      },
+      "html": {
+        "classBytes": 279430,
+        "perElement": 139.7,
+        "bytes": 329435,
+        "gzip": 66173,
+        "brotli": 33696
+      },
+      "total": {
+        "gzip": 144748,
+        "brotli": 96188
+      },
+      "struck": {
+        "count": 571,
+        "rules": 1324,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "border-top-color <- .xh7ihoq | .xp15e70.xp15e70",
+          "border-right-color <- .xh7ihoq | .xp15e70.xp15e70",
+          "border-bottom-color <- .xh7ihoq | .xp15e70.xp15e70"
+        ]
+      }
+    },
+    {
+      "id": "tailwind",
+      "label": "Tailwind CSS",
+      "build": {
+        "coldMs": 218,
+        "warmMs": 224
+      },
+      "css": {
+        "raw": 89187,
+        "bytes": 66680,
+        "gzip": 9844,
+        "brotli": 6748,
+        "rules": 1327
+      },
+      "js": {
+        "bytes": 219692,
+        "gzip": 44710,
+        "brotli": 35782
+      },
+      "runtime": {
+        "loadMs": 4.06,
+        "classNamesPerSec": 10472640
+      },
+      "html": {
+        "classBytes": 435133,
+        "perElement": 217.6,
+        "bytes": 485138,
+        "gzip": 70746,
+        "brotli": 31015
+      },
+      "total": {
+        "gzip": 125300,
+        "brotli": 73545
+      },
+      "struck": {
+        "count": 1400,
+        "rules": 1147,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "align-items <- .items-start | .lg\\:items-center",
+          "padding-top <- .py-2 | .lg\\:py-12",
+          "padding-bottom <- .py-2 | .lg\\:py-12"
+        ]
+      }
+    },
+    {
+      "id": "tailwind-merge",
+      "label": "Tailwind CSS + tailwind-merge",
+      "build": {
+        "coldMs": 282,
+        "warmMs": 311
+      },
+      "css": {
+        "raw": 89187,
+        "bytes": 66680,
+        "gzip": 9844,
+        "brotli": 6748,
+        "rules": 1327
+      },
+      "js": {
+        "bytes": 258619,
+        "gzip": 57342,
+        "brotli": 45263
+      },
+      "runtime": {
+        "loadMs": 7.95,
+        "classNamesPerSec": 108136
+      },
+      "html": {
+        "classBytes": 398960,
+        "perElement": 199.5,
+        "bytes": 448965,
+        "gzip": 67540,
+        "brotli": 34252
+      },
+      "total": {
+        "gzip": 134726,
+        "brotli": 86263
+      },
+      "struck": {
+        "count": 969,
+        "rules": 1147,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "align-items <- .items-start | .lg\\:items-center",
+          "padding-top <- .py-2 | .lg\\:py-12",
+          "padding-bottom <- .py-2 | .lg\\:py-12"
+        ]
+      }
+    },
+    {
+      "id": "unocss",
+      "label": "UnoCSS",
+      "build": {
+        "coldMs": 804,
+        "warmMs": 857
+      },
+      "css": {
+        "raw": 105132,
+        "bytes": 100197,
+        "gzip": 11120,
+        "brotli": 7252,
+        "rules": 1340
+      },
+      "js": {
+        "bytes": 219692,
+        "gzip": 44710,
+        "brotli": 35782
+      },
+      "runtime": {
+        "loadMs": 4.73,
+        "classNamesPerSec": 9805961
+      },
+      "html": {
+        "classBytes": 435133,
+        "perElement": 217.6,
+        "bytes": 485138,
+        "gzip": 70746,
+        "brotli": 31015
+      },
+      "total": {
+        "gzip": 126576,
+        "brotli": 74049
+      },
+      "struck": {
+        "count": 2017,
+        "rules": 1335,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "color <- .aria-selected\\:text-muted[aria-selected=\"true\"], .text-muted | .text-muted",
+          "border-top-color <- .aria-selected\\:border-accent[aria-selected=\"true\"], .border-accent | .aria-selected\\:border-muted[aria-selected=\"true\"], .border-muted | .border-accent | .border-muted",
+          "border-right-color <- .aria-selected\\:border-accent[aria-selected=\"true\"], .border-accent | .aria-selected\\:border-muted[aria-selected=\"true\"], .border-muted | .border-accent | .border-muted"
+        ]
+      }
+    },
+    {
+      "id": "panda",
+      "label": "Panda CSS",
+      "build": {
+        "coldMs": 202,
+        "warmMs": 218
+      },
+      "css": {
+        "raw": 80795,
+        "bytes": 59914,
+        "gzip": 8957,
+        "brotli": 6050,
+        "rules": 1326
+      },
+      "js": {
+        "bytes": 336802,
+        "gzip": 53929,
+        "brotli": 41471
+      },
+      "runtime": {
+        "loadMs": 31.78,
+        "classNamesPerSec": 36693
+      },
+      "html": {
+        "classBytes": 613578,
+        "perElement": 306.8,
+        "bytes": 663583,
+        "gzip": 74290,
+        "brotli": 34284
+      },
+      "total": {
+        "gzip": 137176,
+        "brotli": 81805
+      },
+      "struck": {
+        "count": 251,
+        "rules": 1324,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "font-weight <- .font-weight_400 | .md\\:font-weight_600",
+          "border-top-style <- .border-style_solid | .md\\:border-style_dashed",
+          "border-right-style <- .border-style_solid | .md\\:border-style_dashed"
+        ]
+      }
+    },
+    {
+      "id": "vanilla-extract",
+      "label": "vanilla-extract",
+      "build": {
+        "coldMs": 3301,
+        "warmMs": 3211
+      },
+      "css": {
+        "raw": 390528,
+        "bytes": 390485,
+        "gzip": 49692,
+        "brotli": 42333,
+        "rules": 4216
+      },
+      "js": {
+        "bytes": 61750,
+        "gzip": 17262,
+        "brotli": 10816
+      },
+      "runtime": {
+        "loadMs": 3.56,
+        "classNamesPerSec": 9308111
+      },
+      "html": {
+        "classBytes": 31984,
+        "perElement": 16,
+        "bytes": 81989,
+        "gzip": 10945,
+        "brotli": 9109
+      },
+      "total": {
+        "gzip": 77899,
+        "brotli": 62258
+      },
+      "struck": {
+        "count": 1244,
+        "rules": 4216,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "padding-top <- .f2fj5f0 | .f2fj5f0",
+          "padding-bottom <- .f2fj5f0 | .f2fj5f0",
+          "font-weight <- .f2fj5f0 | .f2fj5f1"
+        ]
+      }
+    }
+  ]
+}

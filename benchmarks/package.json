@@ -1,0 +1,32 @@
+{
+  "name": "purser-benchmarks",
+  "private": true,
+  "type": "module",
+  "description": "Purser CSS compared with other styling tools on one generated design system. Not part of the published package.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:quick": "node run.mjs --components 100 --runs 3"
+  },
+  "dependencies": {
+    "@avonao/purser": "file:..",
+    "@babel/core": "^7.29.0",
+    "@babel/plugin-syntax-jsx": "^7.28.0",
+    "@babel/preset-typescript": "^7.28.0",
+    "@pandacss/dev": "^2.6.0",
+    "@stylexjs/babel-plugin": "^0.19.2",
+    "@stylexjs/stylex": "^0.19.2",
+    "@tailwindcss/cli": "^4.3.5",
+    "@unocss/cli": "^66.13.0",
+    "@unocss/preset-wind4": "^66.13.0",
+    "@vanilla-extract/css": "^1.21.3",
+    "@vanilla-extract/esbuild-plugin": "^2.3.22",
+    "clsx": "^2.1.1",
+    "esbuild": "^0.28.2",
+    "lightningcss": "^1.33.0",
+    "postcss": "^8.5.6",
+    "tailwind-merge": "^3.7.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^5.9.3",
+    "unocss": "^66.13.0"
+  }
+}

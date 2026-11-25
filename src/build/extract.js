@@ -39,9 +39,11 @@ function scriptKind(ts, file) {
 }
 
 /** Parse one file and set up static evaluation in it: imports, const bindings, literals. */
-function createScope(file, text, ctx) {
+function createScope(file, text, ctx, always = false) {
   const { ts } = ctx;
-  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, scriptKind(ts, file));
+  // Parsed without parent links: letting the parser set them costs twice the parse itself. The one walk below sets
+  // them and notes the nodes extraction looks at, so the tree is walked once instead of three times.
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, scriptKind(ts, file));
   const pos = (node) => {
     const p = sf.getLineAndCharacterOfPosition(node.getStart(sf));
     return { line: p.line + 1, column: p.character + 1 };
@@ -58,7 +60,8 @@ function createScope(file, text, ctx) {
     const clause = st.importClause;
     if (!clause || clause.isTypeOnly) continue;
     const spec = st.moduleSpecifier.text;
-    const own = spec === ctx.packageName;
+    // The package's rule-granularity runtime (…/rule) has the same API.
+    const own = spec === ctx.packageName || spec === `${ctx.packageName}/rule`;
     const locals = new Map();
     if (clause.name) {
       imports.set(clause.name.text, { spec, imported: 'default' });
@@ -300,7 +303,28 @@ function createScope(file, text, ctx) {
     }
   }
 
-  return { ts, sf, pos, cssNames, nsNames, tokenFns, imports, importNodes, positions, state, isCssRef, isTokenFn, lookup, ev };
+  // --- one walk: parent links, and the nodes that can matter, in source order -----------------------------------
+  /** Identifiers bound to `css`, property accesses (with a namespace import) and calls. */
+  const candidates = [];
+  if (always || cssNames.size > 0 || nsNames.size > 0 || tokenFns.size > 0) {
+    const K = ts.SyntaxKind;
+    const watchAccess = nsNames.size > 0;
+    let current = sf;
+    const step = (node) => {
+      node.parent = current;
+      const kind = node.kind;
+      if (kind === K.Identifier) {
+        if (cssNames.has(node.text)) candidates.push(node);
+      } else if (kind === K.CallExpression || (watchAccess && kind === K.PropertyAccessExpression)) candidates.push(node);
+      const saved = current;
+      current = node;
+      ts.forEachChild(node, step);
+      current = saved;
+    };
+    ts.forEachChild(sf, step);
+  }
+
+  return { ts, sf, pos, cssNames, nsNames, tokenFns, imports, importNodes, positions, state, isCssRef, isTokenFn, lookup, ev, candidates };
 }
 
 /**
@@ -322,7 +346,7 @@ export function extractFile(file, text, ctx) {
   }
 
   // --- find calls --------------------------------------------------------------
-  const visit = (node) => {
+  const inspect = (node) => {
     if (ctx.nodes && ts.isCallExpression(node) && node.arguments.length === 1 && scope.isTokenFn(node.expression)) {
       try {
         tokenCalls.push({ node, value: ev(node) });
@@ -359,7 +383,6 @@ export function extractFile(file, text, ctx) {
         }
       }
     }
-    ts.forEachChild(node, visit);
   };
 
   /** Every use of `css` must be a direct css.<api>(…) call, or the build would miss styles. */
@@ -390,7 +413,7 @@ export function extractFile(file, text, ctx) {
     return pos(node);
   }
 
-  visit(sf);
+  for (const node of scope.candidates) inspect(node);
   return ctx.nodes ? { calls, diagnostics, propsCalls, tokenCalls, scope } : { calls, diagnostics };
 }
 
@@ -407,7 +430,7 @@ export function extractStaticExports(file, text, ctx) {
   const failed = { ok: false, sets: [], statics: {} };
   let scope;
   try {
-    scope = createScope(file, text, { ...ctx, resolveStatic: () => undefined, naming: ctx.naming ?? { prefix: 'x', salt: '', names: 'legacy' } });
+    scope = createScope(file, text, { ...ctx, resolveStatic: () => undefined, naming: ctx.naming ?? { prefix: 'x', salt: '', names: 'legacy' } }, true);
   } catch {
     return failed;
   }

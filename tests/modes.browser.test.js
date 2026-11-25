@@ -30,6 +30,16 @@ function renderWith(env, pageModule = path.join(page, 'page.js')) {
   return JSON.parse(execFileSync(process.execPath, [renderer, pageModule], { env: { ...process.env, ...env }, encoding: 'utf8' }));
 }
 
+/** A copy of the page fixture that imports the runtime from another entry (inside the repository, so it resolves). */
+function pageWith(specifier) {
+  const out = fs.mkdtempSync(path.join(ROOT, 'tests/.page-'));
+  temps.push(out);
+  for (const name of ['page.js', 'styles.js', 'tokens.js']) {
+    fs.writeFileSync(path.join(out, name), fs.readFileSync(path.join(page, name), 'utf8').replaceAll(`from '@avonao/purser'`, `from '${specifier}'`));
+  }
+  return path.join(out, 'page.js');
+}
+
 async function inChrome(css, body, fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'purser-mode-'));
   temps.push(dir);
@@ -69,14 +79,15 @@ async function assertSameLook(chrome) {
 }
 
 for (const [label, options, env] of [
-  ['rule granularity', { granularity: 'rule' }, { PURSER_GRANULARITY: 'rule' }],
+  ['rule granularity', { granularity: 'rule' }, {}],
   ['a minified stylesheet', { minify: true }, {}],
-  ['rule granularity, minified, short names', { granularity: 'rule', minify: true, names: 'short', salt: 't' }, { PURSER_GRANULARITY: 'rule', PURSER_NAMES: 'short', PURSER_SALT: 't' }],
+  ['rule granularity, minified, short names', { granularity: 'rule', minify: true, names: 'short', salt: 't' }, { PURSER_NAMES: 'short', PURSER_SALT: 't' }],
 ]) {
   test(`${label}: nothing is overridden in any state and the page looks the same`, { skip }, async () => {
     const result = await build({ projectDir: page, src: ['.'], tokens: 'tokens.js', cache: false, ...options });
     assert.deepEqual(result.diagnostics, []);
-    const body = renderWith(env);
+    // the main entry computes one class per property; rule granularity is the runtime in @avonao/purser/rule
+    const body = renderWith(env, options.granularity === 'rule' ? pageWith('@avonao/purser/rule') : undefined);
     for (const cls of new Set(body.match(/class="([^"]*)"/g).flatMap((m) => m.slice(7, -1).split(' ')))) {
       assert.ok(result.css.includes(`.${cls}`), `class ${cls} has CSS`);
     }

@@ -13,6 +13,23 @@ export interface BuildOptions {
   prefix?: string;
   /** Hash salt (default ""); must match createCss({ salt }). */
   salt?: string;
+  /**
+   * Class names: "legacy" (default: prefix + 7 characters), "short" (4 characters) or "min" (the shortest there are,
+   * most used first; the modules must then be compiled). Must match createCss({ names }).
+   */
+  names?: 'legacy' | 'short' | 'min';
+  /** One class per property of a style (default) or one per generated rule. Must match createCss({ granularity }). */
+  granularity?: 'property' | 'rule';
+  /** Write the stylesheet without whitespace and merge rules that write the same declaration. */
+  minify?: boolean;
+  /** With names "min": a JSON file that keeps the names between builds, relative to projectDir. */
+  namesFile?: string;
+  /** With names "min": a registry shared with a compiler (see `@avonao/purser/compiler`). */
+  registry?: NameRegistry;
+  /** `false`: no extraction cache on disk. A string: its directory (default `node_modules/.cache/purser`). */
+  cache?: boolean | string;
+  /** Worker threads for parsing (default: the processors minus one from four processors on, at most 8; 0: none). */
+  threads?: number;
   /** Import specifier of the runtime (default "@avonao/purser"). */
   packageName?: string;
   /** Module exporting a custom `css = createCss({ prefix, salt })`, relative to projectDir. */
@@ -49,6 +66,21 @@ export interface BuildResult {
   /** True when the output file changed on disk. */
   written: boolean;
   outFile: string | null;
+  /** With names "min": the minimal name of every class, by its legacy name. */
+  names: Record<string, string> | null;
+}
+
+/** The names given with `names: 'min'`: append-only, the most used class first. */
+export interface NameRegistry {
+  readonly prefix: string;
+  /** The name of a class, giving it the next free one when it has none. */
+  get(id: string): string;
+  has(id: string): boolean;
+  /** Name every class without a name, the most used first. */
+  assign(uses: Map<string, number>): void;
+  readonly version: number | string;
+  readonly size: number;
+  toJSON(): Record<string, string>;
 }
 
 /** Build once and write `out` (only when its content changed). */
@@ -63,4 +95,6 @@ export declare function createBuilder(options: BuildOptions): {
   projectDir: string;
   tokensFile: string | null;
   outFile: string | null;
+  /** With names "min": the registry the builder fills. */
+  registry: NameRegistry | null;
 };

@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { createCompiler } from '../src/compiler/index.js';
 import { foldOutcomes, transformSource } from '../src/compiler/transform.js';
 import { createCss, defineTokens } from '../src/index.js';
+import { createAnyCss } from '../src/rule.js';
 import { ROOT, tryRequire } from './helpers/host.js';
 
 const ts = tryRequire('typescript');
@@ -19,7 +20,7 @@ function context(options = {}) {
     ts,
     packageName: '@avonao/purser',
     naming,
-    css: createCss(naming),
+    css: createAnyCss(naming),
     resolveStatic: (spec) => (spec === './tokens' ? statics : undefined),
     isPure: (spec) => spec === './tokens',
   };
@@ -154,14 +155,14 @@ export const cases = {
 };
 `;
   for (const granularity of ['property', 'rule']) {
-    const out = transformSource(source, path.join(tmp, 'cases.js'), { ...context({ granularity }), naming: { prefix: 'x', salt: '', names: 'legacy', granularity }, css: createCss({ granularity }) });
+    const out = transformSource(source, path.join(tmp, 'cases.js'), { ...context({ granularity }), naming: { prefix: 'x', salt: '', names: 'legacy', granularity }, css: createAnyCss({ granularity }) });
     assert.equal(out.stats.folded, 9);
     assert.equal(out.stats.dynamic, 0);
     assert.ok(!out.code.includes('@avonao/purser'));
     const compiledFile = path.join(tmp, `compiled-${granularity}.mjs`);
     fs.writeFileSync(compiledFile, out.code);
     const runtimeFile = path.join(tmp, `runtime-${granularity}.mjs`);
-    fs.writeFileSync(runtimeFile, source.replace(`import { css } from '@avonao/purser';`, `import { createCss } from '@avonao/purser';\nconst css = createCss({ granularity: '${granularity}' });`));
+    fs.writeFileSync(runtimeFile, source.replace(`import { css } from '@avonao/purser';`, `import { createCss } from '@avonao/purser/rule';\nconst css = createCss({ granularity: '${granularity}' });`));
     const compiled = (await import(pathToFileURL(compiledFile).href)).cases;
     const runtime = (await import(pathToFileURL(runtimeFile).href)).cases;
     for (const name of Object.keys(runtime)) {

@@ -12,7 +12,7 @@ import { isSourceFile } from '../build/files.js';
 import { loadTokensModule } from '../build/load-tokens.js';
 import { resolveNaming } from '../hash.js';
 import { createNameRegistry } from '../names.js';
-import { createCss } from '../runtime.js';
+import { createAnyCss } from '../rule.js';
 import { transformSource } from './transform.js';
 
 /**
@@ -42,7 +42,7 @@ export function createCompiler(options = {}) {
   // (a module outside its source directories) still gets a name here, but no rule in the stylesheet.
   const registry = base.names === 'min' ? (options.registry ?? createNameRegistry({ prefix: base.minPrefix })) : null;
   const naming = registry ? { ...base, rename: (id) => registry.get(id) } : base;
-  const css = createCss(naming);
+  const css = createAnyCss(naming);
   const ts = loadTypeScript(projectDir);
   const tsOptions = compilerOptions(ts, projectDir);
   const resolutionCache = ts.createModuleResolutionCache(projectDir, (x) => x, tsOptions);

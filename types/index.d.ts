@@ -210,10 +210,22 @@ export interface Css {
 
 /** Naming options; the build must be given the same values. */
 export interface CssOptions {
-  /** Class name prefix (default `"x"`). */
+  /** Class name prefix (default `"x"`; with `names: 'min'` the prefix of the minimal names, default `"_"`). */
   readonly prefix?: string;
   /** Hash salt (default `""`); change it only to resolve a reported collision. */
   readonly salt?: string;
+  /**
+   * Class names: `'legacy'` (default: the prefix and 7 characters), `'short'` (4 characters) or `'min'` (the shortest
+   * there are, given by the build to the most used classes first). `'min'` needs the compiler: the runtime cannot
+   * compute the names.
+   */
+  readonly names?: 'legacy' | 'short' | 'min';
+  /**
+   * `'property'` (default): one class per property of a style. `'rule'`: one class per generated rule, so styles
+   * share the rules they have in common and the stylesheet holds each rule once. `'rule'` is computed by the compiler,
+   * or at run time by `createCss` from `@avonao/purser/rule` (this entry does not carry the code for it).
+   */
+  readonly granularity?: 'property' | 'rule';
 }
 
 /** The default css API (prefix `x`). */

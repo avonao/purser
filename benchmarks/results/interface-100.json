@@ -1,0 +1,424 @@
+{
+  "date": "2026-11-25",
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor",
+    "cores": 2,
+    "node": "v22.23.4",
+    "platform": "linux x64"
+  },
+  "corpus": {
+    "model": "interface",
+    "components": 100,
+    "styles": 355,
+    "declarations": 2789,
+    "pageElements": 2000,
+    "runs": 3
+  },
+  "results": [
+    {
+      "id": "purser-min",
+      "label": "Purser (compiled, minimal names)",
+      "note": "the production setup: rule granularity, minified stylesheet, names given by the build",
+      "build": {
+        "coldMs": 377,
+        "warmMs": 134
+      },
+      "css": {
+        "raw": 31031,
+        "bytes": 30865,
+        "gzip": 5714,
+        "brotli": 4861,
+        "rules": 764
+      },
+      "js": {
+        "bytes": 31410,
+        "gzip": 8104,
+        "brotli": 6892
+      },
+      "runtime": {
+        "loadMs": 0.84,
+        "classNamesPerSec": 4616844
+      },
+      "html": {
+        "classBytes": 185631,
+        "perElement": 92.8,
+        "bytes": 235636,
+        "gzip": 22479,
+        "brotli": 12598
+      },
+      "total": {
+        "gzip": 36297,
+        "brotli": 24351
+      },
+      "struck": {
+        "count": 0,
+        "rules": 503,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "purser-compiled",
+      "label": "Purser (compiled, hashed names)",
+      "note": "rule granularity and a minified stylesheet, with names that need no registry",
+      "build": {
+        "coldMs": 390,
+        "warmMs": 123
+      },
+      "css": {
+        "raw": 35980,
+        "bytes": 35814,
+        "gzip": 9180,
+        "brotli": 8204,
+        "rules": 764
+      },
+      "js": {
+        "bytes": 53308,
+        "gzip": 14439,
+        "brotli": 12143
+      },
+      "runtime": {
+        "loadMs": 0.89,
+        "classNamesPerSec": 4649505
+      },
+      "html": {
+        "classBytes": 468772,
+        "perElement": 234.4,
+        "bytes": 518777,
+        "gzip": 64641,
+        "brotli": 20563
+      },
+      "total": {
+        "gzip": 88260,
+        "brotli": 40910
+      },
+      "struck": {
+        "count": 0,
+        "rules": 503,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "purser",
+      "label": "Purser (runtime, 0.1 defaults)",
+      "note": "no compiler: css.create runs in the browser, one class per property",
+      "build": {
+        "coldMs": 364,
+        "warmMs": 115
+      },
+      "css": {
+        "raw": 74134,
+        "bytes": 57477,
+        "gzip": 11010,
+        "brotli": 9300,
+        "rules": 1318
+      },
+      "js": {
+        "bytes": 105395,
+        "gzip": 21064,
+        "brotli": 17732
+      },
+      "runtime": {
+        "loadMs": 31.25,
+        "classNamesPerSec": 209542
+      },
+      "html": {
+        "classBytes": 368836,
+        "perElement": 184.4,
+        "bytes": 418841,
+        "gzip": 45031,
+        "brotli": 17115
+      },
+      "total": {
+        "gzip": 77105,
+        "brotli": 44147
+      },
+      "struck": {
+        "count": 0,
+        "rules": 916,
+        "skipped": 0,
+        "elements": 300,
+        "sample": []
+      }
+    },
+    {
+      "id": "stylex",
+      "label": "StyleX",
+      "build": {
+        "coldMs": 4727,
+        "warmMs": 4785
+      },
+      "css": {
+        "raw": 23552,
+        "bytes": 18015,
+        "gzip": 4724,
+        "brotli": 4175,
+        "rules": 442
+      },
+      "js": {
+        "bytes": 110296,
+        "gzip": 13433,
+        "brotli": 11382
+      },
+      "runtime": {
+        "loadMs": 1.05,
+        "classNamesPerSec": 3561305
+      },
+      "html": {
+        "classBytes": 279298,
+        "perElement": 139.6,
+        "bytes": 329303,
+        "gzip": 33698,
+        "brotli": 15294
+      },
+      "total": {
+        "gzip": 51855,
+        "brotli": 30851
+      },
+      "struck": {
+        "count": 1098,
+        "rules": 426,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "row-gap <- .xcusyza | .xbvtmzp.xbvtmzp",
+          "column-gap <- .xcusyza | .xbvtmzp.xbvtmzp",
+          "padding-top <- .xlfww5h | .x1ms5z6y.x1ms5z6y"
+        ]
+      }
+    },
+    {
+      "id": "tailwind",
+      "label": "Tailwind CSS",
+      "build": {
+        "coldMs": 204,
+        "warmMs": 187
+      },
+      "css": {
+        "raw": 27813,
+        "bytes": 20184,
+        "gzip": 3698,
+        "brotli": 2888,
+        "rules": 436
+      },
+      "js": {
+        "bytes": 43772,
+        "gzip": 9334,
+        "brotli": 7917
+      },
+      "runtime": {
+        "loadMs": 1.19,
+        "classNamesPerSec": 5593169
+      },
+      "html": {
+        "classBytes": 419102,
+        "perElement": 209.6,
+        "bytes": 469107,
+        "gzip": 34596,
+        "brotli": 14815
+      },
+      "total": {
+        "gzip": 47628,
+        "brotli": 25620
+      },
+      "struck": {
+        "count": 1958,
+        "rules": 414,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "align-items <- .items-center | .items-stretch | .md\\:items-center | .md\\:items-stretch",
+          "justify-content <- .justify-between | .md\\:justify-start",
+          "row-gap <- .gap-3 | .md\\:gap-16"
+        ]
+      }
+    },
+    {
+      "id": "tailwind-merge",
+      "label": "Tailwind CSS + tailwind-merge",
+      "build": {
+        "coldMs": 195,
+        "warmMs": 206
+      },
+      "css": {
+        "raw": 27813,
+        "bytes": 20184,
+        "gzip": 3698,
+        "brotli": 2888,
+        "rules": 436
+      },
+      "js": {
+        "bytes": 74697,
+        "gzip": 19056,
+        "brotli": 15897
+      },
+      "runtime": {
+        "loadMs": 3.07,
+        "classNamesPerSec": 816564
+      },
+      "html": {
+        "classBytes": 377678,
+        "perElement": 188.8,
+        "bytes": 427683,
+        "gzip": 37232,
+        "brotli": 15699
+      },
+      "total": {
+        "gzip": 59986,
+        "brotli": 34484
+      },
+      "struck": {
+        "count": 1516,
+        "rules": 414,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "align-items <- .items-stretch | .md\\:items-center",
+          "justify-content <- .justify-between | .md\\:justify-start",
+          "row-gap <- .gap-3 | .md\\:gap-16"
+        ]
+      }
+    },
+    {
+      "id": "unocss",
+      "label": "UnoCSS",
+      "build": {
+        "coldMs": 471,
+        "warmMs": 467
+      },
+      "css": {
+        "raw": 37375,
+        "bytes": 35995,
+        "gzip": 4335,
+        "brotli": 3349,
+        "rules": 506
+      },
+      "js": {
+        "bytes": 43772,
+        "gzip": 9334,
+        "brotli": 7917
+      },
+      "runtime": {
+        "loadMs": 1.13,
+        "classNamesPerSec": 7116837
+      },
+      "html": {
+        "classBytes": 419102,
+        "perElement": 209.6,
+        "bytes": 469107,
+        "gzip": 34596,
+        "brotli": 14815
+      },
+      "total": {
+        "gzip": 48265,
+        "brotli": 26081
+      },
+      "struck": {
+        "count": 2693,
+        "rules": 501,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "font-size <- .text-lg | .md\\:text-xl",
+          "line-height <- .text-lg | .md\\:text-xl",
+          "color <- .text-accent | .text-accent"
+        ]
+      }
+    },
+    {
+      "id": "panda",
+      "label": "Panda CSS",
+      "build": {
+        "coldMs": 132,
+        "warmMs": 121
+      },
+      "css": {
+        "raw": 24917,
+        "bytes": 17526,
+        "gzip": 3283,
+        "brotli": 2598,
+        "rules": 435
+      },
+      "js": {
+        "bytes": 72562,
+        "gzip": 13322,
+        "brotli": 11190
+      },
+      "runtime": {
+        "loadMs": 8.09,
+        "classNamesPerSec": 86419
+      },
+      "html": {
+        "classBytes": 591585,
+        "perElement": 295.8,
+        "bytes": 641590,
+        "gzip": 45265,
+        "brotli": 17013
+      },
+      "total": {
+        "gzip": 61870,
+        "brotli": 30801
+      },
+      "struck": {
+        "count": 416,
+        "rules": 433,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "justify-content <- .justify-content_flex-start | .md\\:justify-content_space-between | .lg\\:justify-content_space-between",
+          "justify-content <- .justify-content_flex-start | .md\\:justify-content_space-between | .lg\\:justify-content_space-between",
+          "justify-content <- .justify-content_flex-start | .md\\:justify-content_space-between | .lg\\:justify-content_space-between"
+        ]
+      }
+    },
+    {
+      "id": "vanilla-extract",
+      "label": "vanilla-extract",
+      "build": {
+        "coldMs": 735,
+        "warmMs": 732
+      },
+      "css": {
+        "raw": 81328,
+        "bytes": 81161,
+        "gzip": 10616,
+        "brotli": 9582,
+        "rules": 867
+      },
+      "js": {
+        "bytes": 12717,
+        "gzip": 3791,
+        "brotli": 2567
+      },
+      "runtime": {
+        "loadMs": 1.31,
+        "classNamesPerSec": 5700623
+      },
+      "html": {
+        "classBytes": 32621,
+        "perElement": 16.3,
+        "bytes": 82626,
+        "gzip": 7169,
+        "brotli": 6319
+      },
+      "total": {
+        "gzip": 21576,
+        "brotli": 18468
+      },
+      "struck": {
+        "count": 1824,
+        "rules": 867,
+        "skipped": 0,
+        "elements": 300,
+        "sample": [
+          "padding-top <- .f2fj5f0 | .f2fj5f0",
+          "padding-bottom <- .f2fj5f0 | .f2fj5f0",
+          "padding-left <- .f2fj5f0 | .f2fj5f0"
+        ]
+      }
+    }
+  ]
+}

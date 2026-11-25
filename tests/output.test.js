@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { compileStylesheet } from '../src/compile/stylesheet.js';
 import { createCss, defineTokens } from '../src/index.js';
+import { createAnyCss, createCss as createRuleCss, css as ruleCss } from '../src/rule.js';
 import { createNameRegistry, sequenceName } from '../src/names.js';
 import { TOKENS } from '../src/tokens.js';
 import { tryRequire } from './helpers/host.js';
@@ -42,7 +43,7 @@ test('rule granularity: styles share the rules they have in common', async () =>
 test('rule granularity: the runtime gives exactly the classes the stylesheet has', () => {
   const { css } = compile({ granularity: 'rule' });
   const inSheet = classesOf(css);
-  const runtime = createCss({ granularity: 'rule' }).create(styles);
+  const runtime = createRuleCss().create(styles);
   const used = new Set(Object.values(runtime).flatMap((map) => Object.values(map).flatMap((v) => (v ? v.split(' ') : []))));
   for (const cls of used) assert.ok(inSheet.has(cls) || /* a marker has no rule of its own */ runtime.b.opacity.split(' ').includes(cls), `class ${cls}`);
   // a: color has two rules (not hover, hover), display one, gap two longhands
@@ -63,7 +64,7 @@ test('rule granularity: a global rule excludes every atom class and fills the ga
   const { css, diagnostics } = compile({ granularity: 'rule' }, calls);
   assert.deepEqual(diagnostics, []);
   assert.deepEqual(await selfCheck(css), []);
-  const runtime = createCss({ granularity: 'rule' }).create(calls[0].value);
+  const runtime = ruleCss.create(calls[0].value);
   const [rule, marker] = runtime.b.opacity.split(' ');
   // elements without an opacity class get the global value; an element with b gets it while it is not disabled
   assert.match(css, new RegExp(`button:not\\((?:\\.x\\w{7}, )*\\.${runtime.a.opacity}`));
@@ -127,9 +128,15 @@ test('minimal names: the most used class gets the shortest name, and the registr
 test('minimal names: the runtime cannot compute them, the compiler can', () => {
   assert.throws(() => createCss({ names: 'min' }).create({ a: { color: 'red' } }), /names "min" are given by the build/);
   const registry = createNameRegistry({ prefix: '' });
-  const css = createCss({ names: 'min', rename: (id) => registry.get(id) });
+  const css = createAnyCss({ names: 'min', rename: (id) => registry.get(id) });
   assert.deepEqual(css.create({ a: { color: 'red', display: 'block' } }).a, { color: 'a', display: 'b' });
   assert.match(css.keyframes({ from: { opacity: 0 } }), /^x[0-9a-z]{7}$/);
+});
+
+test('the main entry stays small: rule granularity is computed by @avonao/purser/rule or by the compiler', () => {
+  assert.throws(() => createCss({ granularity: 'rule' }).create({ a: { color: 'red' } }), /granularity "rule" is computed by the compiler .* or by the runtime in @avonao\/purser\/rule/);
+  assert.equal(createRuleCss({ granularity: 'property' }).create({ a: { gap: 1 } }).a['row-gap'], createCss().create({ a: { gap: 1 } }).a['row-gap']);
+  assert.throws(() => createCss({ granularity: 'atom' }), /granularity must be/);
 });
 
 test('sequenceName: every name once, shortest first, always a valid class name', () => {
