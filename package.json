@@ -78,8 +78,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\" && node --test tests/short/*.test.js",
-    "test:update": "UPDATE_GOLDEN=1 node --test --test-concurrency=1 \"tests/**/*.test.js\"",
+    "test": "node --import ./tests/helpers/env.js --test --test-concurrency=1 \"tests/**/*.test.js\" && node --import ./tests/helpers/env.js --test tests/short/*.test.js",
+    "test:update": "UPDATE_GOLDEN=1 node --import ./tests/helpers/env.js --test --test-concurrency=1 \"tests/**/*.test.js\"",
     "bench": "npm --prefix benchmarks run bench"
   },
   "dependencies": {

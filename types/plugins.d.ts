@@ -22,6 +22,18 @@ export interface PluginOptions extends CompilerOptions {
   compile?: boolean;
 }
 
+/** Options of the loader (`@avonao/purser/webpack-loader`), for webpack, Rspack and Turbopack: plain values only. */
+export interface LoaderOptions extends CompilerOptions {
+  /** With names "min": the names file of the build that writes the stylesheet (`purser build --names-file`). */
+  namesFile?: string;
+  /**
+   * Milliseconds to wait for a class name that the stylesheet build has not given yet, before failing. A module with a
+   * new style can reach the loader before a watching build has seen it. Default: 5000 under `NODE_ENV=development`,
+   * else 0.
+   */
+  waitForNames?: number;
+}
+
 /** Vite plugin (also a Rollup plugin). */
 export declare function purser(options?: PluginOptions): {
   name: 'purser';

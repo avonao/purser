@@ -130,7 +130,7 @@ export default {
 };
 ```
 
-With `names: 'min'` under Turbopack, give the same `namesFile` to `purser build --names min --names-file …` and to the loader: the build writes the names, the loader reads them. The loader tells the bundler that a compiled module depends on that file, so a bundler that keeps compiled modules between builds compiles them again when the names change.
+With `names: 'min'` under Turbopack, give the same `namesFile` to `purser build --names min --names-file …` and to the loader: the build writes the names, the loader reads them. Names are append-only, so a module that was compiled stays right when a class is added; the loader tells the bundler that a compiled module depends on the *generation* of the names (a small file in the cache directory that changes when the names file is started again) and on the plan, so a bundler that keeps compiled modules between builds compiles them again exactly when a class can have another name. Beside `purser build --watch`, a module with a new style can reach the loader before the build has named its classes: the loader waits for the name (`waitForNames`, 5 seconds under `NODE_ENV=development`) instead of failing.
 
 [Hypdriv](https://github.com/avonao/hypdriv) sets all of this up from `purser.compile` in `hypdriv.config.ts`.
 

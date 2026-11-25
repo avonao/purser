@@ -14,12 +14,69 @@ const FORMAT = 2;
 
 export const hashText = (text) => crypto.createHash('sha1').update(text).digest('base64url').slice(0, 22);
 
-/** Where a project's cache lives: next to its dependencies, or in the temporary directory when it has none installed. */
+/**
+ * Where a project's cache lives: next to its dependencies. In a workspace whose packages keep theirs in a directory
+ * further up, in that one, under a name of the project's own; without any, in the user's cache directory.
+ *
+ * Never in the shared temporary directory: the cache holds what modules compile to, so it must be a place that only
+ * the people who can already change the project's dependencies can write to.
+ */
 export function cacheDirectory(projectDir, configured) {
   if (typeof configured === 'string') return path.resolve(projectDir, configured);
-  const modules = path.join(projectDir, 'node_modules');
-  if (fs.existsSync(modules)) return path.join(modules, '.cache', 'purser');
-  return path.join(os.tmpdir(), 'purser-cache', hashText(projectDir));
+  const own = path.join(projectDir, 'node_modules');
+  if (isDirectory(own)) return path.join(own, '.cache', 'purser');
+  for (let dir = path.dirname(projectDir); ; dir = path.dirname(dir)) {
+    const modules = path.join(dir, 'node_modules');
+    if (isDirectory(modules)) return path.join(modules, '.cache', 'purser', hashText(projectDir));
+    if (path.dirname(dir) === dir) break;
+  }
+  return path.join(userCacheDirectory(), hashText(projectDir));
+}
+
+function isDirectory(dir) {
+  try {
+    return fs.statSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** The directory an operating system gives a user's programs for what they can compute again. */
+function userCacheDirectory() {
+  if (process.env.XDG_CACHE_HOME) return path.join(process.env.XDG_CACHE_HOME, 'purser');
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Caches', 'purser');
+  if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local'), 'purser', 'Cache');
+  return path.join(os.homedir(), '.cache', 'purser');
+}
+
+/**
+ * Look at a file through one open: `use` gets its modification time and size and a function that reads its text. What
+ * is read is what the stamp describes, whatever happens to the path in between.
+ * @template T
+ * @param {string} file
+ * @param {(stat: { mtimeMs: number, size: number }, read: () => string) => T} use
+ * @returns {T}
+ */
+export function withFile(file, use) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    return use(fs.fstatSync(fd), () => fs.readFileSync(fd, 'utf8'));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** Replace a file in one step: written beside it under a name nobody can have prepared, then renamed over it. */
+export function writeAtomic(file, text) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
+  try {
+    fs.writeFileSync(tmp, text, { flag: 'wx', mode: 0o644 });
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    throw err;
+  }
 }
 
 /**
@@ -68,10 +125,7 @@ export function openCache({ dir, key }) {
       }
       if (!dirty) return;
       try {
-        fs.mkdirSync(dir, { recursive: true });
-        const tmp = `${file}.${process.pid}.tmp`;
-        fs.writeFileSync(tmp, JSON.stringify(data));
-        fs.renameSync(tmp, file);
+        writeAtomic(file, JSON.stringify(data));
         dirty = false;
       } catch {
         // a read-only or full disk: the build is unaffected

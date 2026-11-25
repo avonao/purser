@@ -6,9 +6,9 @@ import assert from 'node:assert/strict';
 export async function assertNoStrikes(chrome, strikeScript) {
   const strikes = () => chrome.evaluate(strikeScript);
   const setWidth = (width) => chrome.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-  const setRoot = (cls) => chrome.evaluate(`document.documentElement.className = ${JSON.stringify(cls)}`);
+  const setRoot = (cls) => chrome.call((value) => { document.documentElement.className = value; }, cls);
   const hover = async (sel) => {
-    const r = await chrome.evaluate(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+    const r = await chrome.call((selector) => { const b = document.querySelector(selector).getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; }, sel);
     await chrome.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y });
   };
   const assertClean = (report, label) => assert.equal(report.count, 0, `${label}: ${JSON.stringify(report.struck.slice(0, 5), null, 1)}`);
@@ -40,7 +40,7 @@ export async function assertNoStrikes(chrome, strikeScript) {
 }
 
 export const computedStyle = (chrome, sel, prop, pseudo = null) =>
-  chrome.evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(sel)}), ${JSON.stringify(pseudo)}).getPropertyValue(${JSON.stringify(prop)})`);
+  chrome.call((selector, name, part) => getComputedStyle(document.querySelector(selector), part).getPropertyValue(name), sel, prop, pseudo);
 
 const LOOK = [
   'display', 'color', 'background-color', 'opacity', 'cursor', 'font-size', 'box-shadow', 'column-gap', 'row-gap',
@@ -56,8 +56,7 @@ const LOOK = [
  */
 export async function snapshot(chrome) {
   const read = () =>
-    chrome.evaluate(`(() => {
-      const props = ${JSON.stringify(LOOK)};
+    chrome.call((props) => {
       // an animation that is still running would make a value depend on when it is read
       for (const a of document.getAnimations()) a.finish();
       return [...document.querySelectorAll('body, body *')].map((el) => {
@@ -65,11 +64,11 @@ export async function snapshot(chrome) {
         const before = getComputedStyle(el, '::before');
         return [el.tagName + (el.id ? '#' + el.id : ''), props.map((p) => cs.getPropertyValue(p)).join('|'), before.getPropertyValue('content') + '|' + before.getPropertyValue('color')];
       });
-    })()`);
+    }, LOOK);
   const setWidth = (width) => chrome.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-  const setRoot = (cls) => chrome.evaluate(`document.documentElement.className = ${JSON.stringify(cls)}`);
+  const setRoot = (cls) => chrome.call((value) => { document.documentElement.className = value; }, cls);
   const hover = async (sel) => {
-    const r = await chrome.evaluate(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+    const r = await chrome.call((selector) => { const b = document.querySelector(selector).getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; }, sel);
     await chrome.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y });
   };
   // whatever looked at the page before may have left the keyboard focus on an element

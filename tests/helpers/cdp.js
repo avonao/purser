@@ -53,6 +53,13 @@ export async function launchChrome() {
     if (r.exceptionDetails) throw new Error(`page script failed: ${JSON.stringify(r.exceptionDetails).slice(0, 400)}`);
     return r.result.value;
   };
+  // Call a function in the page with values as its arguments: nothing is pasted into code.
+  const call = async (fn, ...args) => {
+    const { result: page } = await send('Runtime.evaluate', { expression: 'globalThis' });
+    const r = await send('Runtime.callFunctionOn', { functionDeclaration: fn.toString(), objectId: page.objectId, arguments: args.map((value) => ({ value })), awaitPromise: true, returnByValue: true });
+    if (r.exceptionDetails) throw new Error(`page function failed: ${JSON.stringify(r.exceptionDetails).slice(0, 400)}`);
+    return r.result.value;
+  };
   await send('Page.enable');
   const close = () => {
     try {
@@ -63,5 +70,5 @@ export async function launchChrome() {
       fs.rmSync(dir, { recursive: true, force: true });
     } catch {}
   };
-  return { send, evaluate, close };
+  return { send, evaluate, call, close };
 }

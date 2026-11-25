@@ -80,7 +80,7 @@ function chromePath() {
 
 async function struck(html, chrome) {
   const { launch } = await import('./scripts/chrome.mjs');
-  return launch(chrome, html, fs.readFileSync(path.join(here, '..', 'scripts', 'strike-count.js'), 'utf8'));
+  return launch(chrome, html, path.join(here, '..', 'scripts', 'strike-count.js'));
 }
 
 const spec = generateSpec({ components, model: args.model });

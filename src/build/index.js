@@ -8,10 +8,10 @@ import { compileStylesheet, resolveLayers } from '../compile/stylesheet.js';
 import { analyzeModule, moduleContexts } from '../compiler/transform.js';
 import { resolveFuse } from '../fuse.js';
 import { resolveNaming } from '../hash.js';
-import { createNameRegistry, planFileFor, writeAtomic, writePlan } from '../names.js';
+import { createNameRegistry, keepGeneration, planFileFor, writeAtomic, writePlan } from '../names.js';
 import { memoizedClassNames, normalizeNamedStyle } from './memo.js';
 import { makeCreateCss } from '../runtime.js';
-import { cacheDirectory, hashText, openCache } from './cache.js';
+import { cacheDirectory, hashText, openCache, withFile } from './cache.js';
 import { extractFile } from './extract.js';
 import { findSourceFiles, isSourceFile } from './files.js';
 import { compilerOptions, loadPostcss, loadTypeScript, real } from './host.js';
@@ -128,19 +128,16 @@ export function createBuilder(options, internal = {}) {
     }
     if (!m || m.v !== MANIFEST) return null;
     const same = (file, stamp) => {
-      let st;
       try {
-        st = fs.statSync(file);
-      } catch {
-        return stamp === null;
-      }
-      if (stamp === null || st.size !== stamp[1]) return false;
-      if (st.mtimeMs === stamp[0] && stamp[0] < m.builtAt - RACY_MS) return true;
-      // touched, or written too close to that build to trust the clock: the content decides
-      try {
-        return hashText(fs.readFileSync(file, 'utf8')) === stamp[2];
-      } catch {
-        return false;
+        return withFile(file, (st, read) => {
+          if (stamp === null || st.size !== stamp[1]) return false;
+          if (st.mtimeMs === stamp[0] && stamp[0] < m.builtAt - RACY_MS) return true;
+          // touched, or written too close to that build to trust the clock: the content decides
+          return hashText(read()) === stamp[2];
+        });
+      } catch (err) {
+        // gone now, and it was not there then either
+        return err.code === 'ENOENT' && stamp === null;
       }
     };
     if (!same(tsconfigFile, m.tsconfig) || (tokensFile && !same(tokensFile, m.tokens))) return null;
@@ -171,7 +168,7 @@ export function createBuilder(options, internal = {}) {
       const text = textIf(namesFile, m.names);
       if (text === null) return null;
       const planFile = planFileFor(namesFile, projectDir);
-      if (m.plan === null ? fs.existsSync(planFile) : textIf(planFile, m.plan) === null) return null;
+      if (m.plan === null ? readIfExists(planFile) !== null : textIf(planFile, m.plan) === null) return null;
       names = JSON.parse(text);
     }
     return { css, diagnostics: m.warnings, stats: m.stats, written: false, outFile, names };
@@ -190,19 +187,27 @@ export function createBuilder(options, internal = {}) {
     let tokens = { definition: null, exports: {} };
     let tokensText = null;
     let tokensRaw = null;
-    if (tokensFile) {
+    // What the build reads of the tokens module and of tsconfig.json, each with the stamp of exactly that text: the
+    // record of this build names what it was made from, also when a file changes while it runs.
+    const stamped = (file) => {
       try {
-        tokensText = fs.readFileSync(tokensFile, 'utf8');
+        return withFile(file, (st, read) => {
+          const text = read();
+          return { text, stamp: [st.mtimeMs, st.size, hashText(text)] };
+        });
       } catch {
-        // loadTokensModule reports a missing file
+        return { text: null, stamp: null };
       }
-    }
+    };
+    const tokensRead = tokensFile ? stamped(tokensFile) : { text: null, stamp: null }; // loadTokensModule reports a missing file
+    tokensText = tokensRead.text;
+    const tsconfigRead = stamped(tsconfigFile);
     const tokensHash = tokensText === null ? '' : hashText(tokensText);
     // Everything but file contents that an extraction result depends on.
     const disk = cacheEnabled
       ? openCache({
           dir: cacheDirectory(projectDir, options.cache),
-          key: hashText(JSON.stringify([VERSION, packageName, identity, tokensHash, cssModuleReal, readIfExists(path.join(projectDir, 'tsconfig.json'))])),
+          key: hashText(JSON.stringify([VERSION, packageName, identity, tokensHash, cssModuleReal, tsconfigRead.text])),
         })
       : null;
     if (tokensFile) {
@@ -279,21 +284,16 @@ export function createBuilder(options, internal = {}) {
     const pending = []; // { file, rel, text, hash, stat }
     /** For the manifest: [rel, mtimeMs, size, content hash] of every source file (null once one was not read). */
     let stamps = manifestFile ? [] : null;
-    for (const file of files) {
-      const stat = fs.statSync(file);
-      if (tokensReal && real(file) === tokensReal) {
-        stamps?.push([path.relative(projectDir, file), stat.mtimeMs, stat.size, tokensHash]);
-        continue;
-      }
+    const look = (file, stat, read) => {
       const hit = memory.get(file);
       if (hit && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size && hit.tokensKey === tokensKey) {
         results.set(file, hit.result);
         // keep its entry in the disk cache alive
         if (disk && hit.hash) disk.get(hit.rel, hit.hash);
         stamps = null;
-        continue;
+        return;
       }
-      const text = fs.readFileSync(file, 'utf8');
+      const text = read();
       const relevant = text.includes(packageName) || (cssModuleReal && /\bcss\b/.test(text));
       const rel = path.relative(projectDir, file);
       const remember = (result, hash) => {
@@ -303,13 +303,22 @@ export function createBuilder(options, internal = {}) {
       if (!relevant) {
         stamps?.push([rel, stat.mtimeMs, stat.size, hashText(text)]);
         remember({ calls: [], diagnostics: [] }, null);
-        continue;
+        return;
       }
       const hash = hashText(text);
       stamps?.push([rel, stat.mtimeMs, stat.size, hash]);
       const stored = disk?.get(rel, hash, wantModules);
       if (stored) remember(wantModules ? { calls: revive(file, stored.c), diagnostics: [], module: stored.m } : { calls: revive(file, stored.c), diagnostics: [] }, hash);
       else pending.push({ file, rel, text, hash, remember });
+    };
+    for (const file of files) {
+      if (tokensReal && real(file) === tokensReal) {
+        // the tokens module among the sources: as it was read when the build started
+        stamps?.push([path.relative(projectDir, file), ...tokensRead.stamp]);
+        continue;
+      }
+      // one open per file: the stamp that is remembered is the stamp of the text that is read
+      withFile(file, (stat, read) => look(file, stat, read));
     }
 
     // Parse what is left: on worker threads when there is enough of it, else here.
@@ -403,7 +412,7 @@ export function createBuilder(options, internal = {}) {
     diagnostics.push(...compiled.diagnostics);
     const stats = { files: files.length, ...compiled.stats };
     let css = diagnostics.some((d) => d.severity === 'error') ? null : compiled.css;
-    const current = css && outFile && fs.existsSync(outFile) ? fs.readFileSync(outFile, 'utf8') : null;
+    const current = css && outFile ? readIfExists(outFile) : null;
     // The self-check re-parses the output; a stylesheet identical to the one on disk passed it when it was written.
     if (css && css !== current && getPostcss()) {
       for (const problem of selfCheck(css, getPostcss())) diagnostics.push({ severity: 'error', message: `self-check: ${problem}` });
@@ -417,27 +426,20 @@ export function createBuilder(options, internal = {}) {
     }
     if (css && namesFile && registry) {
       const text = `${JSON.stringify(registry.toJSON(), null, 1)}\n`;
-      const saved = fs.existsSync(namesFile) ? fs.readFileSync(namesFile, 'utf8') : null;
+      const saved = readIfExists(namesFile);
       // A compiler in another process reads these while it runs: each is replaced in one step.
+      keepGeneration(namesFile, projectDir, saved, registry.toJSON());
       if (saved !== text) writeAtomic(namesFile, text);
       writePlan(namesFile, projectDir, registry.plan);
     }
     if (manifestFile) {
-      if (css && stamps) writeManifest(css, diagnostics, stats, stamps);
+      if (css && stamps) writeManifest(css, diagnostics, stats, stamps, { tsconfig: tsconfigRead.stamp, tokens: tokensRead.stamp });
       else fs.rmSync(manifestFile, { force: true }); // a failed build leaves nothing to answer from
     }
     return { css, diagnostics, stats, written, outFile, names: registry ? registry.toJSON() : null };
   }
 
-  function writeManifest(css, diagnostics, stats, files) {
-    const stamp = (file) => {
-      try {
-        const st = fs.statSync(file);
-        return [st.mtimeMs, st.size, hashText(fs.readFileSync(file, 'utf8'))];
-      } catch {
-        return null;
-      }
-    };
+  function writeManifest(css, diagnostics, stats, files, read) {
     const hashOf = (file) => {
       try {
         return hashText(fs.readFileSync(file, 'utf8'));
@@ -448,8 +450,8 @@ export function createBuilder(options, internal = {}) {
     const manifest = {
       v: MANIFEST,
       builtAt: Date.now(),
-      tsconfig: stamp(tsconfigFile),
-      tokens: tokensFile ? stamp(tokensFile) : null,
+      tsconfig: read.tsconfig,
+      tokens: tokensFile ? read.tokens : null,
       files,
       out: hashText(css),
       names: namesFile ? hashOf(namesFile) : null,
@@ -459,10 +461,7 @@ export function createBuilder(options, internal = {}) {
       warnings: diagnostics.filter((d) => d.severity !== 'error'),
     };
     try {
-      fs.mkdirSync(path.dirname(manifestFile), { recursive: true });
-      const tmp = `${manifestFile}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(manifest));
-      fs.renameSync(tmp, manifestFile);
+      writeAtomic(manifestFile, JSON.stringify(manifest));
     } catch {
       // a read-only or full disk: the next build simply does the work
     }
@@ -493,9 +492,10 @@ function readIfExists(file) {
 }
 
 function readNames(file) {
-  if (!file || !fs.existsSync(file)) return undefined;
+  const text = file ? readIfExists(file) : null;
+  if (text === null) return undefined;
   try {
-    const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const data = JSON.parse(text);
     if (data && typeof data === 'object' && !Array.isArray(data) && Object.values(data).every((v) => typeof v === 'string')) return data;
   } catch {
     // fall through

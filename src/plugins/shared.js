@@ -7,7 +7,7 @@ import { createBuilder } from '../build/index.js';
 import { createCompiler } from '../compiler/index.js';
 import { contextKey, resolveFuse } from '../fuse.js';
 import { resolveNaming } from '../hash.js';
-import { createNameRegistry, PlanError, planFileFor, readPlan } from '../names.js';
+import { createNameRegistry, generationFileFor, PlanError, planFileFor, readPlan } from '../names.js';
 
 /**
  * @typedef {import('../compiler/index.js').CompilerOptions & {
@@ -89,8 +89,15 @@ export function createPluginCore(options = {}, defaults = {}) {
 }
 
 function readNames(file) {
-  if (!file || !fs.existsSync(file)) return undefined;
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!file) return undefined;
+  let text;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') return undefined; // no names kept yet
+    throw err;
+  }
+  return JSON.parse(text);
 }
 
 /**
@@ -125,15 +132,21 @@ function fileRegistry(file, prefix, projectDir) {
     if (!names.has(id)) load();
     const name = names.get(id);
     if (name === undefined) {
-      throw new Error(`purser: ${file} has no name for class ${id}. Build the stylesheet first (purser build --names min --names-file …): it gives the names.`);
+      const err = new Error(`purser: ${file} has no name for class ${id}. Build the stylesheet first (purser build --names min --names-file …): it gives the names.`);
+      // a loader beside a watching build waits for the name (see waitForNames)
+      Object.assign(err, { code: 'PURSER_NAME_MISSING' });
+      throw err;
     }
     return name;
   };
   return {
     prefix,
     get,
-    /** The files a compiled module's names come from (a bundler that caches modules must watch them). */
-    files: [file, planFile],
+    /**
+     * What a compiled module's names depend on, for a bundler that keeps compiled modules: the generation of the names
+     * (it changes when names are given anew, not when one is added) and the plan.
+     */
+    files: [generationFileFor(file, projectDir), planFile],
     /** Read the files again if a build has replaced them (asked once per module). */
     refresh: load,
     resolve(ids) {

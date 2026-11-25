@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
 import { build, createBuilder } from '../src/build/index.js';
+import { cacheDirectory, withFile } from '../src/build/cache.js';
 import { extractStaticExports } from '../src/build/extract.js';
 import { loadTypeScript } from '../src/build/host.js';
 import { loadTokensModule, readTokensModule } from '../src/build/load-tokens.js';
@@ -181,4 +182,62 @@ test('a project on TypeScript 7 (no parser API) builds with the parser Purser de
   const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'purser-bare-'));
   temps.push(bare);
   assert.equal(typeof loadTypeScript(bare).createSourceFile, 'function');
+});
+
+test('the cache directory: the project\'s node_modules, the nearest one above, the user\'s cache directory, never the temporary one', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'purser-cachedir-'));
+  temps.push(base);
+  const own = path.join(base, 'own');
+  fs.mkdirSync(path.join(own, 'node_modules'), { recursive: true });
+  assert.equal(cacheDirectory(own), path.join(own, 'node_modules', '.cache', 'purser'));
+  assert.equal(cacheDirectory(own, 'elsewhere'), path.join(own, 'elsewhere'));
+  // two packages of a workspace that keeps its dependencies at the root: the root's node_modules, a directory each
+  const root = path.join(base, 'workspace');
+  const [a, b] = ['a', 'b'].map((name) => path.join(root, 'packages', name));
+  for (const dir of [path.join(root, 'node_modules'), a, b]) fs.mkdirSync(dir, { recursive: true });
+  assert.equal(path.dirname(cacheDirectory(a)), path.join(root, 'node_modules', '.cache', 'purser'));
+  assert.notEqual(cacheDirectory(a), cacheDirectory(b));
+  assert.equal(cacheDirectory(a), cacheDirectory(a));
+  // no dependencies anywhere above: the user's cache directory, a directory per project
+  const bare = path.join(base, 'bare');
+  fs.mkdirSync(bare);
+  const above = [];
+  for (let dir = path.dirname(bare); path.dirname(dir) !== dir; dir = path.dirname(dir)) above.push(dir);
+  if (!above.some((dir) => fs.existsSync(path.join(dir, 'node_modules')))) {
+    const saved = process.env.XDG_CACHE_HOME;
+    process.env.XDG_CACHE_HOME = path.join(base, 'xdg');
+    try {
+      assert.equal(path.dirname(cacheDirectory(bare)), path.join(base, 'xdg', 'purser'));
+      assert.ok(!cacheDirectory(bare).startsWith(path.join(os.tmpdir(), 'purser-cache') + path.sep), 'not the directory 0.2 drafts shared between users');
+    } finally {
+      if (saved === undefined) delete process.env.XDG_CACHE_HOME;
+      else process.env.XDG_CACHE_HOME = saved;
+    }
+  }
+});
+
+test('a file is read through one open: the stamp is the stamp of the text, and a build records what it read', { skip }, async () => {
+  const dir = project({ 'tokens.ts': TOKENS, 'src/a.ts': A, 'tsconfig.json': '{}' });
+  const file = path.join(dir, 'src/a.ts');
+  const seen = withFile(file, (stat, read) => ({ size: stat.size, text: read() }));
+  assert.equal(seen.text, A);
+  assert.equal(seen.size, Buffer.byteLength(A));
+  assert.throws(() => withFile(path.join(dir, 'missing.ts'), () => 1), { code: 'ENOENT' });
+  // the record of a one-shot build: every stamp is [modification time, size, hash of the text]
+  const options = { projectDir: dir, src: ['src'], tokens: 'tokens.ts', out: 'out.css', cache: '.cache', threads: 0 };
+  const first = await build(options);
+  assert.equal(first.written, true);
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, '.cache', fs.readdirSync(path.join(dir, '.cache')).find((f) => f.startsWith('build-'))), 'utf8'));
+  for (const stamp of [manifest.tsconfig, manifest.tokens, manifest.files[0].slice(1)]) {
+    assert.equal(stamp.length, 3);
+    assert.equal(typeof stamp[0], 'number');
+    assert.equal(typeof stamp[2], 'string');
+  }
+  assert.equal(manifest.tokens[1], Buffer.byteLength(TOKENS));
+  // nothing changed: answered from the record; the tokens module rewritten with the same size: the content decides
+  assert.equal((await build(options)).written, false);
+  fs.writeFileSync(path.join(dir, 'tokens.ts'), TOKENS.replace("'#111'", "'#222'"));
+  const again = await build(options);
+  assert.equal(again.written, true);
+  assert.ok(again.css.includes('#222') || again.css !== first.css);
 });

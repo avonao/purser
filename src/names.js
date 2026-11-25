@@ -13,9 +13,10 @@
 //
 // Build-only module.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { cacheDirectory, hashText } from './build/cache.js';
+import { cacheDirectory, hashText, writeAtomic } from './build/cache.js';
 import { contextKey } from './fuse.js';
 
 const FIRST = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -155,6 +156,48 @@ export function planFileFor(namesFile, projectDir) {
 }
 
 /**
+ * A file that changes when the names of a names file are given anew, and only then. Names are append-only: a build
+ * that adds classes leaves every name it gave before, so a module compiled earlier is still right. Only when the
+ * names file was started again (deleted, or edited by hand) can a class have another name. A loader tells its
+ * bundler that a compiled module depends on this file instead of on the names file, so a new class does not make the
+ * bundler compile every module again, and names given anew do.
+ * @param {string} namesFile absolute path
+ * @param {string} projectDir
+ */
+export function generationFileFor(namesFile, projectDir) {
+  return path.join(cacheDirectory(projectDir), `names-${hashText(namesFile).slice(0, 10)}.gen`);
+}
+
+/**
+ * Keep the generation of a names file: a new one when the names about to be saved do not keep every name of the file
+ * as it is (or there is no generation yet), the same one otherwise.
+ * @param {string} namesFile
+ * @param {string} projectDir
+ * @param {string | null} savedText the names file as it is on disk
+ * @param {Record<string, string>} names what is about to be saved
+ */
+export function keepGeneration(namesFile, projectDir, savedText, names) {
+  const file = generationFileFor(namesFile, projectDir);
+  let kept = false;
+  if (savedText !== null) {
+    try {
+      const saved = JSON.parse(savedText);
+      kept = Object.entries(saved).every(([id, name]) => names[id] === name);
+    } catch {
+      // not a names file: whatever was compiled from it is void
+    }
+  }
+  if (kept) {
+    try {
+      if (fs.statSync(file).size > 0) return;
+    } catch {
+      // no generation yet
+    }
+  }
+  writeAtomic(file, `${crypto.randomBytes(12).toString('hex')}\n`);
+}
+
+/**
  * Write the plan that belongs to a names file: which names every group of classes is written as, or that the build did
  * not fuse. The file is complete in itself (a compiler that reads it needs nothing from the names file) and replaced
  * in one step, so a compiler in another process never reads half of it.
@@ -196,10 +239,4 @@ export function readPlan(namesFile, projectDir) {
   return { level: data.level, covers: new Map(Object.entries(data.covers).map(([k, v]) => [k, v.split(' ')])) };
 }
 
-/** Replace a file in one step (write beside it, then rename), so no reader ever sees part of it. */
-export function writeAtomic(file, text) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, text);
-  fs.renameSync(tmp, file);
-}
+export { writeAtomic };

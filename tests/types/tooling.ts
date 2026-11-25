@@ -4,7 +4,7 @@ import { props, styles } from '@avonao/purser/compiled';
 import { createCompiler } from '@avonao/purser/compiler';
 import { purserEsbuild } from '@avonao/purser/esbuild';
 import { purser } from '@avonao/purser/vite';
-import { PurserWebpackPlugin } from '@avonao/purser/webpack';
+import { type LoaderOptions, PurserWebpackPlugin } from '@avonao/purser/webpack';
 
 const options: BuildOptions = { projectDir: '.', src: ['src'], tokens: 'tokens.ts', out: 'purser.css', granularity: 'rule', names: 'min', namesFile: 'names.json', minify: true, fuse: 'exact', modules: true, cache: false, threads: 0 };
 const builder = createBuilder(options);
@@ -29,6 +29,11 @@ const cls: string = props(s.a, false, [s.b]);
 props({ color: 'x1' });
 // @ts-expect-error unknown build option
 build({ projectDir: '.', src: [], mangle: true });
+
+// the loader's options are plain values (Turbopack passes them between processes)
+export const loaderOptions: LoaderOptions = { tokens: 'lib/tokens.ts', names: 'min', namesFile: 'names.json', waitForNames: 2000 };
+// @ts-expect-error the loader does not write the stylesheet
+export const notLoaderOptions: LoaderOptions = { tokens: 'lib/tokens.ts', out: 'app/purser.css' };
 
 export const plugins = [
   purser({ tokens: 'src/tokens.ts', src: ['src'], out: 'src/purser.css', names: 'min', fuse: 'max' }),

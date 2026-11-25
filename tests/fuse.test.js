@@ -11,7 +11,7 @@ import { build, createBuilder, watch } from '../src/build/index.js';
 import { main } from '../src/cli.js';
 import { createCompiler } from '../src/compiler/index.js';
 import { contextKey, planFusion, resolveFuse } from '../src/fuse.js';
-import { createNameRegistry, planFileFor, PlanError } from '../src/names.js';
+import { createNameRegistry, planFileFor, PlanError, generationFileFor } from '../src/names.js';
 import { createPluginCore } from '../src/plugins/shared.js';
 import { ROOT, tryRequire } from './helpers/host.js';
 
@@ -347,7 +347,7 @@ test('the loader reads fused names from the plan the build keeps, and plain name
   const namesFile = path.join(dir, 'names.json');
   const options = { projectDir: dir, src: ['src'], tokens: 'src/tokens.ts', out: 'src/purser.css', granularity: 'rule', names: 'min', namesFile: 'names.json', minify: true, threads: 0 };
   const loaderOptions = { projectDir: dir, tokens: 'src/tokens.ts', granularity: 'rule', names: 'min', namesFile: 'names.json' };
-  const classesIn = (code) => [...code.matchAll(/"((?: ?_[\w-]+)+)"/g)].flatMap((m) => m[1].trim().split(' '));
+  const classesIn = (code) => [...code.matchAll(/"( ?_[\w-]+(?: _[\w-]+)*)"/g)].flatMap((m) => m[1].trim().split(' '));
 
   const fused = await build({ ...options, fuse: 'max' });
   assert.deepEqual(fused.diagnostics, []);
@@ -359,7 +359,8 @@ test('the loader reads fused names from the plan the build keeps, and plain name
   assert.ok(Object.values(names).every((v) => typeof v === 'string'), 'the names file stays a flat map of names');
 
   const one = await runLoader(dir, path.join(dir, 'src/button.ts'), loaderOptions);
-  assert.deepEqual(one.dependencies, [namesFile, planFile], 'a bundler that caches modules compiles this one again when the names change');
+  const generationFile = generationFileFor(namesFile, dir);
+  assert.deepEqual(one.dependencies, [generationFile, planFile], 'a bundler that keeps compiled modules compiles this one again when names are given anew or the plan changes');
   const css = fs.readFileSync(path.join(dir, 'src/purser.css'), 'utf8');
   assert.ok(classesIn(one.code).length > 0);
   for (const cls of classesIn(one.code)) assert.ok(css.includes(`.${cls}`), `fused class ${cls} is in the stylesheet`);
@@ -375,6 +376,50 @@ test('the loader reads fused names from the plan the build keeps, and plain name
   for (const cls of classesIn(two.code)) assert.ok(css2.includes(`.${cls}`), `class ${cls} is in the stylesheet`);
   assert.ok(/plain = \(\): string => "(_[\w-]+ ){3,}/.test(two.code), 'one class per rule again');
   assert.equal(plain.stats.fused, undefined);
+});
+
+test('the generation of a names file changes when names are given anew, not when a class is added', { skip }, async () => {
+  const dir = project();
+  fs.mkdirSync(path.join(dir, 'node_modules'));
+  const namesFile = path.join(dir, 'names.json');
+  const options = { projectDir: dir, src: ['src'], tokens: 'src/tokens.ts', out: 'src/purser.css', granularity: 'rule', names: 'min', namesFile: 'names.json', threads: 0 };
+  const generation = () => fs.readFileSync(generationFileFor(namesFile, dir), 'utf8');
+  await build(options);
+  const first = generation();
+  assert.match(first, /^[0-9a-f]{24}\n$/);
+  // a module with a class nobody had: its name is added, every other name stays, and so does the generation
+  const before = JSON.parse(fs.readFileSync(namesFile, 'utf8'));
+  fs.writeFileSync(path.join(dir, 'src/extra.ts'), `import { css } from '@avonao/purser';\nexport const s = css.create({ a: { scrollMarginBlockStart: '3px' } });\n`);
+  await build(options);
+  const after = JSON.parse(fs.readFileSync(namesFile, 'utf8'));
+  assert.ok(Object.keys(after).length > Object.keys(before).length);
+  for (const [id, name] of Object.entries(before)) assert.equal(after[id], name);
+  assert.equal(generation(), first);
+  // the names file started again: a class may have another name now, so what was compiled from it is void
+  fs.rmSync(namesFile);
+  await build(options);
+  assert.notEqual(generation(), first);
+});
+
+test('beside a watching build the loader waits for a name the build has not given yet', { skip }, async () => {
+  const dir = project();
+  fs.mkdirSync(path.join(dir, 'node_modules'));
+  const options = { projectDir: dir, src: ['src'], tokens: 'src/tokens.ts', out: 'src/purser.css', granularity: 'rule', names: 'min', namesFile: 'names.json', threads: 0 };
+  const loaderOptions = { projectDir: dir, tokens: 'src/tokens.ts', granularity: 'rule', names: 'min', namesFile: 'names.json' };
+  await build(options);
+  const file = path.join(dir, 'src/late.ts');
+  fs.writeFileSync(file, `import { css } from '@avonao/purser';\nexport const s = css.create({ a: { scrollMarginBlockEnd: '7px' } });\nexport const late = (): string => css.props(s.a).className;\n`);
+  // without waiting: the stylesheet build has not seen the module, so its class has no name
+  await assert.rejects(runLoader(dir, file, { ...loaderOptions, waitForNames: 0 }), /has no name for class/);
+  // waiting: the build runs a moment later, and the loader goes on with the name it gave
+  const waiting = runLoader(dir, file, { ...loaderOptions, waitForNames: 4000 });
+  await new Promise((r) => setTimeout(r, 150));
+  await build(options);
+  const { code } = await waiting;
+  const css = fs.readFileSync(path.join(dir, 'src/purser.css'), 'utf8');
+  const name = /late = \(\): string => "(_[\w-]+)"/.exec(code)?.[1];
+  assert.ok(name, code);
+  assert.ok(css.includes(`.${name}`));
 });
 
 // --- one-shot builds --------------------------------------------------------------------------------------------------

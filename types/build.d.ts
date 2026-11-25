@@ -39,7 +39,11 @@ export interface BuildOptions {
   modules?: boolean;
   /** With names "min": a registry shared with a compiler (see `@avonao/purser/compiler`). */
   registry?: NameRegistry;
-  /** `false`: no extraction cache on disk. A string: its directory (default `node_modules/.cache/purser`). */
+  /**
+   * `false`: no extraction cache on disk. A string: its directory. Default: `node_modules/.cache/purser`; for a project
+   * without a `node_modules` of its own, a directory named after its path in the nearest one further up, else in the
+   * user's cache directory.
+   */
   cache?: boolean | string;
   /** Worker threads for parsing (default: the processors minus one from four processors on, at most 8; 0: none). */
   threads?: number;
