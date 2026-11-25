@@ -110,7 +110,7 @@ export function createBuilder(options, internal = {}) {
   // file, the tokens, tsconfig.json or an option changed and the stylesheet (with the names) is still what was
   // written, there is nothing to do, and nothing is parsed, compiled or even loaded to find that out.
   const manifestFile =
-    internal.oneShot === true && cacheEnabled && outFile && !options.registry && (naming.names !== 'min' || namesFile)
+    internal.oneShot === true && cacheEnabled && outFile && !options.registry
       ? path.join(
           cacheDirectory(projectDir, options.cache),
           `build-${hashText(JSON.stringify([VERSION, projectDir, options.src, tokensFile, outFile, packageName, identity, naming.names, naming.minPrefix ?? null, cssModuleReal, layers, options.minify === true, fuse, namesFile])).slice(0, 12)}.json`,
@@ -165,7 +165,8 @@ export function createBuilder(options, internal = {}) {
     };
     const css = textIf(outFile, m.out);
     if (css === null) return null;
-    let names = null;
+    // The names: from the names file when the build keeps one (it must still be what was written), else from the record.
+    let names = m.given ?? null;
     if (namesFile) {
       const text = textIf(namesFile, m.names);
       if (text === null) return null;
@@ -453,6 +454,7 @@ export function createBuilder(options, internal = {}) {
       out: hashText(css),
       names: namesFile ? hashOf(namesFile) : null,
       plan: namesFile ? hashOf(planFileFor(namesFile, projectDir)) : null,
+      given: registry && !namesFile ? registry.toJSON() : undefined,
       stats,
       warnings: diagnostics.filter((d) => d.severity !== 'error'),
     };

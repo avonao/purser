@@ -6,16 +6,20 @@ import { purserEsbuild } from '@avonao/purser/esbuild';
 import { purser } from '@avonao/purser/vite';
 import { PurserWebpackPlugin } from '@avonao/purser/webpack';
 
-const options: BuildOptions = { projectDir: '.', src: ['src'], tokens: 'tokens.ts', out: 'purser.css', granularity: 'rule', names: 'min', namesFile: 'names.json', minify: true, cache: false, threads: 0 };
+const options: BuildOptions = { projectDir: '.', src: ['src'], tokens: 'tokens.ts', out: 'purser.css', granularity: 'rule', names: 'min', namesFile: 'names.json', minify: true, fuse: 'exact', modules: true, cache: false, threads: 0 };
 const builder = createBuilder(options);
-const compiler = createCompiler({ projectDir: '.', tokens: 'tokens.ts', granularity: 'rule', names: 'min', registry: builder.registry ?? undefined });
+const compiler = createCompiler({ projectDir: '.', tokens: 'tokens.ts', granularity: 'rule', names: 'min', registry: builder.registry ?? undefined, records: builder.record });
+const level: false | 'exact' | 'balanced' | 'max' = builder.fuse;
+// @ts-expect-error not a level
+build({ projectDir: '.', src: [], names: 'min', fuse: 'most' });
 
 export async function run(): Promise<string | null> {
   const result = await build(options);
   const names: Record<string, string> | null = result.names;
   const compiled = await compiler.transform('', '/x.ts');
   const folded: number = compiled ? compiled.stats.folded : 0;
-  void [names, folded];
+  const fewer: number = result.stats?.fused ? result.stats.fused.ids - result.stats.fused.classes : 0;
+  void [names, folded, fewer, level];
   return result.css;
 }
 
@@ -27,7 +31,7 @@ props({ color: 'x1' });
 build({ projectDir: '.', src: [], mangle: true });
 
 export const plugins = [
-  purser({ tokens: 'src/tokens.ts', src: ['src'], out: 'src/purser.css' }),
+  purser({ tokens: 'src/tokens.ts', src: ['src'], out: 'src/purser.css', names: 'min', fuse: 'max' }),
   purserEsbuild({ tokens: 'src/tokens.ts', names: 'short' }),
   new PurserWebpackPlugin({ tokens: 'lib/tokens.ts', src: ['app'], out: 'app/purser.css', compile: false }),
   cls,

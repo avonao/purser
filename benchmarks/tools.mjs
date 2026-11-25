@@ -31,24 +31,35 @@ const emitPurserProject = (spec, dir) => {
 };
 const purserArgs = (dir, ...more) => [purserBin, 'build', '--project', dir, '--src', 'components,lib', '--tokens', 'lib/tokens.ts', '--out', 'out.css', ...more];
 
+const fused = (level, extra) => ({
+  id: `purser-${level}`,
+  label: `Purser (compiled, fuse: ${level})`,
+  note:
+    level === 'exact'
+      ? 'the production setup: modules compiled, names given by the build, classes that always appear together fused'
+      : level === 'max'
+        ? 'as above, with one class for every group of classes a css.props call applies'
+        : 'as above, plus classes for pairs that often appear together',
+  extra,
+  emit: emitPurserProject,
+  // The plugin writes the stylesheet too; the CLI call with the same options is what is timed.
+  build: (dir) => ({ cmd: process.execPath, args: purserArgs(dir, '--granularity', 'rule', '--minify', '--names', 'min', '--fuse', level), css: 'out.css' }),
+  clean: coldPurser,
+  plugins: async (dir) => [
+    (await import('@avonao/purser/esbuild')).purserEsbuild({ projectDir: dir, tokens: 'lib/tokens.ts', src: ['components', 'lib'], out: 'out.css', minify: true, granularity: 'rule', names: 'min', fuse: level }),
+  ],
+});
+
+/** Entries with `extra` are only run when --only names them. */
 export const TOOLS = [
-  ...['exact', 'balanced', 'max'].map((level) => ({
-    id: `purser-${level}`,
-    label: `Purser (compiled, fuse: ${level})`,
-    note: `rule granularity, minified stylesheet, names given by the build, classes fused (${level})`,
-    emit: emitPurserProject,
-    build: (dir) => ({ cmd: process.execPath, args: purserArgs(dir, '--granularity', 'rule', '--minify', '--names', 'min', '--fuse', level), css: 'out.css' }),
-    clean: coldPurser,
-    plugins: async (dir) => [
-      (await import('@avonao/purser/esbuild')).purserEsbuild({ projectDir: dir, tokens: 'lib/tokens.ts', src: ['components', 'lib'], out: 'out.css', minify: true, granularity: 'rule', names: 'min', fuse: level }),
-    ],
-  })),
+  fused('exact'),
+  fused('max'),
+  fused('balanced', true),
   {
     id: 'purser-min',
-    label: 'Purser (compiled, minimal names)',
-    note: 'the production setup: rule granularity, minified stylesheet, names given by the build',
+    label: 'Purser (compiled, not fused)',
+    note: 'modules compiled, names given by the build, one class per rule',
     emit: emitPurserProject,
-    // The plugin writes the stylesheet too; the CLI call with the same options is what is timed.
     build: (dir) => ({ cmd: process.execPath, args: purserArgs(dir, '--granularity', 'rule', '--minify', '--names', 'min'), css: 'out.css' }),
     clean: coldPurser,
     plugins: async (dir) => [
@@ -58,7 +69,8 @@ export const TOOLS = [
   {
     id: 'purser-compiled',
     label: 'Purser (compiled, hashed names)',
-    note: 'rule granularity and a minified stylesheet, with names that need no registry',
+    note: 'modules compiled, rule granularity, names that need no registry',
+    extra: true,
     emit: emitPurserProject,
     build: (dir) => ({ cmd: process.execPath, args: purserArgs(dir, '--granularity', 'rule', '--minify'), css: 'out.css' }),
     clean: coldPurser,
@@ -66,8 +78,8 @@ export const TOOLS = [
   },
   {
     id: 'purser',
-    label: 'Purser (runtime, 0.1 defaults)',
-    note: 'no compiler: css.create runs in the browser, one class per property',
+    label: 'Purser (runtime only)',
+    note: 'no compiler: css.create runs in the browser, one class per property, hashed names (the 0.1 defaults)',
     emit: emitPurserProject,
     build: (dir) => ({ cmd: process.execPath, args: purserArgs(dir), css: 'out.css' }),
     clean: coldPurser,

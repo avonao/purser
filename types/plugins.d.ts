@@ -9,6 +9,11 @@ export interface PluginOptions extends CompilerOptions {
   out?: string;
   /** Minify the stylesheet (default: in a production build). */
   minify?: boolean;
+  /**
+   * With names "min": give classes that are applied together one class (see `BuildOptions.fuse`). Used in a build
+   * that compiles every module once; a dev server or a watching build keeps one name per class.
+   */
+  fuse?: false | 'exact' | 'balanced' | 'max';
   /** With names "min": a JSON file that keeps the names between builds (and shares them with another process). */
   namesFile?: string;
   /** Names of the cascade layers. */

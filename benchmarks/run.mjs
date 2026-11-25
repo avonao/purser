@@ -1,12 +1,15 @@
 // Benchmark runner: one generated design system, built with each tool.
 //
 //   node run.mjs [--components 500] [--model interface|uniform] [--elements 2000] [--runs 5] [--only purser,tailwind]
-//                [--no-browser] [--json out.json]
+//                [--no-browser] [--json out.json] [--merge]
 //
-// It measures, per tool: the stylesheet build (cold process, median of --runs), the stylesheet (raw, minified with the same
-// minifier for every tool, gzip, brotli), the JavaScript a browser needs for the components' styling (minified, gzip,
-// brotli), the cost of loading that JavaScript and of resolving class names, the class attributes of a page, and the
-// number of declarations a real browser strikes through (overridden) on that page.
+// It measures, per tool: the stylesheet build (a new process each time, median of --runs: with nothing to start from,
+// again with nothing changed, and after one source file changed), the stylesheet (raw, minified with the same minifier
+// for every tool, gzip, brotli), the JavaScript a browser needs for the components' styling (minified, gzip, brotli),
+// the cost of loading that JavaScript and of resolving class names, the class attributes of a page, and the number of
+// declarations a real browser strikes through (overridden) on that page.
+//
+// --merge keeps the rows of tools that are not run this time from the --json file (to measure one tool again).
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -31,6 +34,7 @@ const { values: args } = parseArgs({
     only: { type: 'string' },
     'no-browser': { type: 'boolean', default: false },
     json: { type: 'string' },
+    merge: { type: 'boolean', default: false },
     keep: { type: 'boolean', default: false },
   },
 });
@@ -89,7 +93,7 @@ const chrome = args['no-browser'] ? null : chromePath();
 
 const results = [];
 for (const tool of TOOLS) {
-  if (only && !only.has(tool.id)) continue;
+  if (only ? !only.has(tool.id) : tool.extra) continue;
   const dir = path.join(work, tool.id);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
@@ -107,9 +111,19 @@ for (const tool of TOOLS) {
       cold.push(run(step, dir));
       warm.push(run(step, dir));
     }
+    // One source file changes (a comment, so every tool's output stays what it was) and the build runs again.
+    const source = path.join(dir, 'components', fs.readdirSync(path.join(dir, 'components')).sort()[0]);
+    const original = fs.readFileSync(source, 'utf8');
+    const changed = [];
+    for (let i = 0; i < runs; i++) {
+      fs.writeFileSync(source, `${original}\n// changed ${i}\n`);
+      changed.push(run(step, dir));
+    }
+    fs.writeFileSync(source, original);
+    run(step, dir);
     const css = fs.readFileSync(path.join(dir, step.css), 'utf8');
     const min = minify(css);
-    result.build = { coldMs: Math.round(median(cold)), warmMs: Math.round(median(warm)) };
+    result.build = { coldMs: Math.round(median(cold)), warmMs: Math.round(median(warm)), changedMs: Math.round(median(changed)) };
     result.css = { raw: Buffer.byteLength(css), ...sizes(min), rules: (min.match(/\{[^{}]*\}/g) ?? []).length };
 
     // The JavaScript a browser loads for the styling of these components.
@@ -146,7 +160,8 @@ for (const tool of TOOLS) {
     const body = classes.map((c, i) => `<div class="${c}"${i % 7 === 0 ? ' aria-selected="true"' : ''}>x</div>`).join('\n');
     const html = `<!doctype html><html><head><meta charset="utf-8"><style>${min}</style></head><body>\n${body}\n</body></html>`;
     const attr = classes.reduce((n, c) => n + c.length, 0);
-    result.html = { classBytes: attr, perElement: Number((attr / classes.length).toFixed(1)), ...sizes(body) };
+    const count = classes.reduce((n, c) => n + c.split(' ').filter(Boolean).length, 0);
+    result.html = { classBytes: attr, perElement: Number((attr / classes.length).toFixed(1)), classesPerElement: Number((count / classes.length).toFixed(1)), ...sizes(body) };
     result.total = { gzip: result.css.gzip + result.js.gzip + result.html.gzip, brotli: result.css.brotli + result.js.brotli + result.html.brotli };
     if (chrome) {
       fs.writeFileSync(path.join(dir, 'page.html'), html);
@@ -174,5 +189,13 @@ const report = {
   },
   results,
 };
+if (args.merge && args.json && fs.existsSync(path.resolve(args.json))) {
+  // keep the other tools' rows, in the order of the tool list
+  const before = JSON.parse(fs.readFileSync(path.resolve(args.json), 'utf8'));
+  const fresh = new Map(results.map((r) => [r.id, r]));
+  const kept = new Map(before.results.map((r) => [r.id, r]));
+  report.results = TOOLS.map((t) => fresh.get(t.id) ?? kept.get(t.id)).filter(Boolean);
+  report.date = before.date === report.date ? report.date : `${before.date} and ${report.date}`;
+}
 if (args.json) fs.writeFileSync(path.resolve(args.json), `${JSON.stringify(report, null, 2)}\n`);
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);

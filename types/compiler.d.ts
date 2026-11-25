@@ -1,6 +1,6 @@
 // Type declarations for @avonao/purser/compiler.
 
-import type { NameRegistry } from './build';
+import type { ModuleRecord, NameRegistry } from './build';
 
 export interface CompilerOptions {
   /** Project root (default: the working directory). */
@@ -16,8 +16,13 @@ export interface CompilerOptions {
   packageName?: string;
   /** Module exporting a custom `css = createCss({ … })`, relative to projectDir. */
   cssModule?: string;
-  /** With names "min": the registry of the build that writes the stylesheet. */
+  /** With names "min": the registry of the build that writes the stylesheet (it also holds which classes were fused). */
   registry?: NameRegistry;
+  /**
+   * What the stylesheet build already worked out for a module with this content: pass a builder's `record`, and the
+   * compiler writes such a module without parsing it again.
+   */
+  records?: (file: string, hash: string) => ModuleRecord | null | undefined;
 }
 
 export interface CompileStats {
@@ -49,7 +54,11 @@ export interface CompileResult {
 }
 
 export interface Compiler {
-  /** Compile one module. Null: nothing to compile (or an error the stylesheet build reports); keep the module as it is. */
+  /**
+   * Compile one module. Null: nothing to compile (or an error the stylesheet build reports); keep the module as it is.
+   * With fused classes it rejects for a module that applies a group of classes the build has not seen (a module outside
+   * its source directories, or one that changed after the build).
+   */
   transform(code: string, file: string): Promise<CompileResult | null>;
   /** A cheap test a bundler can run on every module before reading it as a Purser module. */
   accepts(code: string, file: string): boolean;
