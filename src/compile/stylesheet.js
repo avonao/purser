@@ -2,10 +2,12 @@
 
 import { flatten } from '../conditions.js';
 import { PurserError } from '../errors.js';
+import { planFusion, resolveFuse } from '../fuse.js';
 import { resolveNaming } from '../hash.js';
 import { createNameRegistry } from '../names.js';
-import { atomClassName, canonical, keyframesCanonical, keyframesName, normalizeKeyframes, normalizeStyle } from '../normalize.js';
+import { atomClassName, canonical, keyframesCanonical, keyframesName, normalizeKeyframes } from '../normalize.js';
 import { checkValue, leaves } from '../validate.js';
+import { normalizeNamedStyle } from '../build/memo.js';
 import { compileAtoms, cmp } from './atoms.js';
 import { compileGlobals } from './globals.js';
 import { layer, renderRules } from './render.js';
@@ -64,12 +66,18 @@ export function resolveLayers(layers = {}) {
 
 /**
  * Compile token definitions and extracted calls into CSS.
- * @param {{ tokens?: { axes?: object, tokens: object } | null, tokensFile?: string, calls: Call[], prefix?: string, salt?: string, names?: 'short' | 'legacy' | 'min', granularity?: 'property' | 'rule', minify?: boolean, registry?: ReturnType<typeof createNameRegistry>, layers?: { tokens?: string, globals?: string, overrides?: string, atoms?: string } }} input
- * @returns {{ css: string | null, diagnostics: Diagnostic[], stats: { atoms: number, rules: number, keyframes: number, tokens: number }, registry: ReturnType<typeof createNameRegistry> | null }}
+ * @param {{ tokens?: { axes?: object, tokens: object } | null, tokensFile?: string, calls: Call[], prefix?: string, salt?: string, names?: 'short' | 'legacy' | 'min', granularity?: 'property' | 'rule', minify?: boolean, fuse?: false | 'exact' | 'balanced' | 'max', contexts?: { ids: string[], weight?: number }[], registry?: ReturnType<typeof createNameRegistry>, layers?: { tokens?: string, globals?: string, overrides?: string, atoms?: string } }} input
+ * @returns {{ css: string | null, diagnostics: Diagnostic[], stats: { atoms: number, rules: number, keyframes: number, tokens: number, fused?: object }, registry: ReturnType<typeof createNameRegistry> | null }}
  *   registry: with names "min", the names given to the classes (input.registry when one was passed in)
+ *
+ * input.fuse with input.contexts (every group of classes the compiled modules apply whole, see ../fuse.js) fuses
+ * classes that are applied together; it needs names "min", because only the build knows the result.
  */
 export function compileStylesheet(input) {
   const requested = resolveNaming({ prefix: input.prefix, salt: input.salt, names: input.names, granularity: input.granularity });
+  const fuse = resolveFuse(input.fuse);
+  if (fuse && requested.names !== 'min') throw new TypeError('purser: fuse needs names "min" (fused classes are named by the build)');
+  if (fuse && !input.contexts) throw new TypeError('purser: fuse needs the classes the compiled modules apply (contexts)');
   // Minimal names are given once every class and its number of uses is known, so everything is compiled under the
   // legacy names (what the registry names) and renamed where a selector is written.
   const registry = requested.names === 'min' ? (input.registry ?? createNameRegistry({ prefix: requested.minPrefix })) : null;
@@ -115,7 +123,7 @@ export function compileStylesheet(input) {
     for (const name of Object.keys(styles)) {
       let entries;
       try {
-        entries = normalizeStyle(styles[name], [name]);
+        entries = normalizeNamedStyle(styles[name], name);
       } catch (err) {
         report(err, call);
         continue;
@@ -156,14 +164,37 @@ export function compileStylesheet(input) {
     }
   }
 
-  let atomResult = { rules: [], coverage: new Map(), classes: 0, ruleCount: 0, rename: (name) => name };
+  let atomResult = { rules: [], coverage: new Map(), classes: 0, ruleCount: 0, namesOf: (name) => [name] };
+  let fused;
   try {
     atomResult = compileAtoms([...atoms.values()], naming, {
       group: input.minify === true,
       finalize: registry
         ? (uses) => {
-            registry.assign(uses);
-            return (name) => registry.get(name);
+            if (!fuse) {
+              registry.assign(uses);
+              registry.setPlan(null);
+              return (name) => [registry.get(name)];
+            }
+            // Only classes this build compiled can be planned (a context may name one whose style had an error).
+            const plan = planFusion(
+              input.contexts.map((c) => ({ ...c, ids: c.ids.filter((id) => uses.has(id)) })),
+              { level: fuse },
+            );
+            registry.assign(plan.uses);
+            const memberOf = new Map(); // class id -> names of the fused classes it is part of
+            for (const [identity, ids] of plan.classes) {
+              const name = registry.get(identity);
+              for (const id of ids) {
+                const list = memberOf.get(id);
+                if (list) list.push(name);
+                else memberOf.set(id, [name]);
+              }
+            }
+            registry.setPlan({ level: fuse, covers: new Map([...plan.covers].map(([key, identities]) => [key, identities.map((identity) => registry.get(identity))])) });
+            fused = { level: fuse, ...plan.stats };
+            const none = [];
+            return (name) => memberOf.get(name) ?? none;
           }
         : undefined,
     });
@@ -182,7 +213,7 @@ export function compileStylesheet(input) {
   globalCalls.sort((a, b) => (a.layer === b.layer ? 0 : a.layer === 'overrides' ? 1 : -1));
   let globals = { rules: [], fontFaces: [], items: [] };
   try {
-    globals = compileGlobals(globalCalls, atomResult.coverage, atomResult.rename);
+    globals = compileGlobals(globalCalls, atomResult.coverage, atomResult.namesOf);
   } catch (err) {
     report(err);
   }
@@ -227,6 +258,7 @@ export function compileStylesheet(input) {
   }
 
   const stats = { atoms: atomResult.classes, rules: atomResult.ruleCount, keyframes: keyframes.size, tokens: tokens.names.size };
+  if (fused) stats.fused = fused;
   if (diagnostics.some((d) => d.severity === 'error')) return { css: null, diagnostics, stats, registry };
 
   // Render.

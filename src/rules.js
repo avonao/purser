@@ -46,16 +46,17 @@ function hasGap(branches) {
  * The rules of one entry with their class names.
  * @param {import('./normalize.js').Entry} entry  entry.tree must not be null
  * @param {{ prefix: string, salt: string, names: 'short' | 'legacy' }} naming
+ * @param {typeof compileTree} [compile]  a build passes one that remembers its results
  * @returns {{ rules: { className: string, key: string, atRules: string[], suffix: string, value: string }[], marker: string | null, compiled: ReturnType<typeof compileTree> | null }}
  */
-export function entryRules(entry, naming) {
+export function entryRules(entry, naming, compile = compileTree) {
   const { pe, prop, tree } = entry;
   if (typeof tree === 'string') {
     // An unconditional value is one rule with no condition: no need for the condition compiler.
     const key = ruleKey(pe, prop, [], '', tree);
     return { rules: [{ className: makeName(key, naming), key, atRules: [], suffix: '', value: tree }], marker: null, compiled: null };
   }
-  const compiled = compileTree(tree, entry.path);
+  const compiled = compile(tree, entry.path);
   const rules = compiled.rules.map(({ term, value }) => {
     const { selector, atRules } = renderTerm(canonicalTerm(term));
     const suffix = renderSelectorLiterals(selector);

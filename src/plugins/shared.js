@@ -5,19 +5,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createBuilder } from '../build/index.js';
 import { createCompiler } from '../compiler/index.js';
+import { contextKey, resolveFuse } from '../fuse.js';
 import { resolveNaming } from '../hash.js';
-import { createNameRegistry } from '../names.js';
+import { createNameRegistry, PlanError, planFileFor, readPlan } from '../names.js';
 
 /**
  * @typedef {import('../compiler/index.js').CompilerOptions & {
  *   src?: string[],
  *   out?: string,
  *   minify?: boolean,
+ *   fuse?: false | 'exact' | 'balanced' | 'max',
  *   namesFile?: string,
  *   layers?: { tokens?: string, globals?: string, overrides?: string, atoms?: string },
  *   compile?: boolean,
  * }} PluginOptions
- *   src + out: also build the stylesheet; compile: false keeps the modules as they are (stylesheet only)
+ *   src + out: also build the stylesheet; compile: false keeps the modules as they are (stylesheet only);
+ *   fuse: with names "min", give classes that are applied together one class (a one-shot build only: see `oneShot`)
  */
 
 /** A source map as the comment bundlers read from a loaded file. */
@@ -37,12 +40,17 @@ export function formatDiagnostics(diagnostics, cwd = process.cwd()) {
 
 /**
  * @param {PluginOptions} options
- * @param {{ projectDir?: string, minify?: boolean }} [defaults] what the bundler knows (its root, whether it builds for production)
+ * @param {{ projectDir?: string, minify?: boolean, oneShot?: boolean }} [defaults] what the bundler knows: its root,
+ *   whether it builds for production, and whether it builds once (oneShot: false for a dev server or a watching
+ *   build, where a changed file is compiled again and the others are not: classes are then never fused, because a
+ *   fused class depends on every module)
  */
 export function createPluginCore(options = {}, defaults = {}) {
   const projectDir = path.resolve(options.projectDir ?? defaults.projectDir ?? process.cwd());
   const naming = resolveNaming({ prefix: options.prefix, salt: options.salt, names: options.names, granularity: options.granularity });
   const min = naming.names === 'min';
+  const fuse = defaults.oneShot === false ? false : resolveFuse(options.fuse);
+  if (fuse && !min) throw new Error('purser: fuse needs names "min" (fused classes are named by the build)');
   const namesFile = min && options.namesFile ? path.resolve(projectDir, options.namesFile) : null;
   const builds = Array.isArray(options.src) && options.src.length > 0;
   if (builds && !options.out) throw new Error('purser: the plugin was given src, so it also needs out (the stylesheet to write)');
@@ -54,11 +62,15 @@ export function createPluginCore(options = {}, defaults = {}) {
 
   // One registry for the stylesheet and the modules. Without an own build the names come from the file alone.
   let registry = null;
-  if (min) registry = builds ? createNameRegistry({ prefix: naming.minPrefix, names: readNames(namesFile) }) : fileRegistry(namesFile, naming.minPrefix);
+  if (min) registry = builds ? createNameRegistry({ prefix: naming.minPrefix, names: readNames(namesFile) }) : fileRegistry(namesFile, naming.minPrefix, projectDir);
 
   const shared = { ...options, projectDir, registry: registry ?? undefined };
-  const compiler = options.compile === false ? null : createCompiler(shared);
-  const builder = builds ? createBuilder({ ...shared, minify: options.minify ?? defaults.minify ?? false, namesFile: namesFile ?? undefined }) : null;
+  const compiles = options.compile !== false;
+  // The builder also works out what every module compiles to, so the compiler parses nothing a second time.
+  const builder = builds
+    ? createBuilder({ ...shared, fuse, modules: compiles, minify: options.minify ?? defaults.minify ?? false, namesFile: namesFile ?? undefined })
+    : null;
+  const compiler = compiles ? createCompiler({ ...shared, records: builder ? builder.record : undefined }) : null;
 
   let running = null;
   /**
@@ -73,7 +85,7 @@ export function createPluginCore(options = {}, defaults = {}) {
     return running;
   }
 
-  return { projectDir, compiler, builder, registry, buildStylesheet, outFile: builder?.outFile ?? null };
+  return { projectDir, compiler, builder, registry, fuse, buildStylesheet, outFile: builder?.outFile ?? null };
 }
 
 function readNames(file) {
@@ -86,32 +98,61 @@ function readNames(file) {
  * does not have yet is looked up once more (the other build may just have written it) and is an error after that:
  * making a name up here would not match the stylesheet.
  */
-function fileRegistry(file, prefix) {
+function fileRegistry(file, prefix, projectDir) {
+  const planFile = planFileFor(file, projectDir);
   let names = new Map();
+  /** @type {null | { level: string, covers: Map<string, string[]> }} */
+  let plan = null;
   let stamp = '';
-  const load = () => {
-    let next = '';
+  const stampOf = (f) => {
     try {
-      const st = fs.statSync(file);
-      next = `${st.mtimeMs}:${st.size}`;
+      const st = fs.statSync(f);
+      return `${st.mtimeMs}:${st.size}`;
     } catch {
-      next = 'missing';
+      return 'missing';
     }
+  };
+  /** Read both files again when either changed. @returns {boolean} whether anything was read */
+  const load = () => {
+    const next = `${stampOf(file)}|${stampOf(planFile)}`;
     if (next === stamp) return false;
     stamp = next;
-    names = next === 'missing' ? new Map() : new Map(Object.entries(JSON.parse(fs.readFileSync(file, 'utf8'))));
+    names = next.startsWith('missing|') ? new Map() : new Map(Object.entries(JSON.parse(fs.readFileSync(file, 'utf8'))));
+    plan = readPlan(file, projectDir);
     return true;
+  };
+  const get = (id) => {
+    if (!names.has(id)) load();
+    const name = names.get(id);
+    if (name === undefined) {
+      throw new Error(`purser: ${file} has no name for class ${id}. Build the stylesheet first (purser build --names min --names-file …): it gives the names.`);
+    }
+    return name;
   };
   return {
     prefix,
-    get(id) {
-      if (!names.has(id)) load();
-      const name = names.get(id);
-      if (name === undefined) {
-        throw new Error(`purser: ${file} has no name for class ${id}. Build the stylesheet first (purser build --names min --names-file …): it gives the names.`);
+    get,
+    /** The files a compiled module's names come from (a bundler that caches modules must watch them). */
+    files: [file, planFile],
+    /** Read the files again if a build has replaced them (asked once per module). */
+    refresh: load,
+    resolve(ids) {
+      if (stamp === '') load();
+      if (ids.length === 0) return [];
+      if (!plan) {
+        // One name per class, unless a build has fused since the files were read.
+        if (ids.every((id) => names.has(id)) || !load() || !plan) return ids.map(get);
       }
-      return name;
+      const key = contextKey(ids);
+      let cover = plan.covers.get(key);
+      if (!cover && load()) cover = plan?.covers.get(key);
+      if (!cover) throw new PlanError();
+      return cover;
     },
+    get plan() {
+      return plan;
+    },
+    setPlan() {},
     has: (id) => names.has(id) || (load() && names.has(id)),
     assign() {},
     get version() {

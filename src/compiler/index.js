@@ -7,13 +7,16 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { hashText } from '../build/cache.js';
+import { extractFile } from '../build/extract.js';
 import { compilerOptions, loadTypeScript, real } from '../build/host.js';
 import { isSourceFile } from '../build/files.js';
 import { loadTokensModule } from '../build/load-tokens.js';
 import { resolveNaming } from '../hash.js';
-import { createNameRegistry } from '../names.js';
-import { createAnyCss } from '../rule.js';
-import { transformSource } from './transform.js';
+import { createNameRegistry, PlanError } from '../names.js';
+import { memoizedClassNames, normalizeNamedStyle } from '../build/memo.js';
+import { makeCreateCss } from '../runtime.js';
+import { analyzeModule, emitModule } from './transform.js';
 
 /**
  * @typedef {object} CompilerOptions
@@ -24,6 +27,9 @@ import { transformSource } from './transform.js';
  * @property {"short"|"legacy"|"min"} [names]
  * @property {"property"|"rule"} [granularity]
  * @property {ReturnType<typeof createNameRegistry>} [registry]  with names "min": the registry of the build that writes the stylesheet
+ * @property {(file: string, hash: string) => import('./transform.js').ModuleRecord | null | undefined} [records]
+ *   what the stylesheet build already worked out for a module with this content (a builder's `record`): the module is
+ *   then written from it and not parsed again
  * @property {string} [packageName]       runtime import specifier (default "@avonao/purser")
  * @property {string} [cssModule]         module exporting a custom `css = createCss({ … })`, relative to projectDir
  */
@@ -42,15 +48,27 @@ export function createCompiler(options = {}) {
   // (a module outside its source directories) still gets a name here, but no rule in the stylesheet.
   const registry = base.names === 'min' ? (options.registry ?? createNameRegistry({ prefix: base.minPrefix })) : null;
   const naming = registry ? { ...base, rename: (id) => registry.get(id) } : base;
-  const css = createAnyCss(naming);
-  const ts = loadTypeScript(projectDir);
-  const tsOptions = compilerOptions(ts, projectDir);
-  const resolutionCache = ts.createModuleResolutionCache(projectDir, (x) => x, tsOptions);
+  // Modules are compiled with class ids (the names before the registry renames them) and written with the names the
+  // registry has for each group of ids: one name per id, or with fusion the names of the classes that make it up.
+  const identity = { prefix: base.prefix, salt: base.salt, names: base.names === 'min' ? 'legacy' : base.names, granularity: base.granularity };
+  const css = makeCreateCss(memoizedClassNames(), normalizeNamedStyle)(identity);
+  const names = registry ? (ids) => registry.resolve(ids) : undefined;
+  // The parser is loaded when the first module needs parsing: with a builder's records most never do.
+  let host = null;
+  const getHost = () => {
+    if (!host) {
+      const ts = loadTypeScript(projectDir);
+      const tsOptions = compilerOptions(ts, projectDir);
+      host = { ts, tsOptions, resolutionCache: ts.createModuleResolutionCache(projectDir, (x) => x, tsOptions) };
+    }
+    return host;
+  };
   const resolved = new Map(); // "spec\0dir" -> real path of the module, or null
 
   const resolve = (spec, fromFile) => {
     const key = `${spec}\u0000${path.dirname(fromFile)}`;
     if (!resolved.has(key)) {
+      const { ts, tsOptions, resolutionCache } = getHost();
       const r = ts.resolveModuleName(spec, fromFile, tsOptions, ts.sys, resolutionCache).resolvedModule;
       resolved.set(key, r ? real(r.resolvedFileName) : null);
     }
@@ -72,7 +90,7 @@ export function createCompiler(options = {}) {
     if (stamp === tokensStamp) return;
     tokensStamp = stamp;
     try {
-      tokens = await loadTokensModule(tokensFile, { ts, packageName });
+      tokens = await loadTokensModule(tokensFile, { ts: getHost().ts, packageName });
       tokensError = null;
     } catch (err) {
       tokens = { exports: {} };
@@ -81,9 +99,11 @@ export function createCompiler(options = {}) {
   }
 
   const ctx = {
-    ts,
+    get ts() {
+      return getHost().ts;
+    },
     packageName,
-    naming,
+    naming: identity,
     css,
     resolveStatic: (spec, fromFile) => (tokensReal && resolve(spec, fromFile) === tokensReal ? tokens.exports : undefined),
     isCssModule: (spec, fromFile) => Boolean(cssModuleReal) && resolve(spec, fromFile) === cssModuleReal,
@@ -105,15 +125,32 @@ export function createCompiler(options = {}) {
    */
   async function transform(code, file) {
     if (!accepts(code, file)) return null;
-    await ensureTokens();
-    if (tokensError) throw tokensError;
     const clean = file.split('?')[0];
-    // The module that creates the custom `css` keeps the runtime: it is what the others are compiled against.
-    if (cssModuleReal && real(clean) === cssModuleReal) return null;
-    return transformSource(code, clean, ctx);
+    let record = options.records?.(clean, hashText(code));
+    if (record === undefined) {
+      await ensureTokens();
+      if (tokensError) throw tokensError;
+      // The module that creates the custom `css` keeps the runtime: it is what the others are compiled against.
+      if (cssModuleReal && real(clean) === cssModuleReal) return null;
+      let found;
+      try {
+        found = extractFile(clean, code, { ...ctx, ts: getHost().ts, nodes: true });
+      } catch {
+        return null;
+      }
+      record = analyzeModule(found, code, clean, ctx);
+    }
+    if (!record) return null;
+    try {
+      registry?.refresh?.(); // names read from a file another build keeps: take its latest
+      return emitModule(code, clean, record, names);
+    } catch (err) {
+      if (err instanceof PlanError) err.message = `${err.message}: ${path.relative(projectDir, clean) || clean}`;
+      throw err;
+    }
   }
 
   return { transform, accepts, projectDir, tokensFile, naming, packageName, registry };
 }
 
-export { transformSource } from './transform.js';
+export { analyzeModule, emitModule, moduleContexts, transformSource } from './transform.js';

@@ -1,9 +1,9 @@
 // Compile atomic entries into disjoint rules: one class per pseudo-element + property + value tree (property
 // granularity) or one class per rule (rule granularity).
 
-import { compileTree, disjointify, mergeTerms, renderSelectorLiterals, renderTerm } from '../conditions.js';
+import { disjointify, mergeTerms, renderSelectorLiterals, renderTerm } from '../conditions.js';
 import { PurserError } from '../errors.js';
-import { entryRules } from '../rules.js';
+import { cachedEntryRules, compileTreeOnce } from '../build/memo.js';
 import { findOverlap } from '../verify.js';
 
 /**
@@ -36,11 +36,13 @@ function safeToGroup(literals, pe) {
 /**
  * @param {{ className: string, entry: import('../normalize.js').Entry, call?: unknown, uses?: number }[]} atoms distinct value trees
  * @param {{ prefix: string, salt: string, names: 'short' | 'legacy', granularity?: 'property' | 'rule' }} naming
- * @param {{ group?: boolean, finalize?: (uses: Map<string, number>) => (name: string) => string }} [options]
+ * @param {{ group?: boolean, finalize?: (uses: Map<string, number>) => (name: string) => string[] }} [options]
  *   group: merge rules that write the same declaration into one selector list;
- *   finalize: called once with every class and its number of uses, returns the name each class is written under
- * @returns {{ rules: import('./render.js').CssRule[], coverage: Map<string, AtomCoverage[]>, classes: number, ruleCount: number, rename: (name: string) => string }}
- *   coverage is keyed by `${pe}|${prop}`
+ *   finalize: called once with every class and its number of uses, returns the names each class is written under
+ *   (one; with fusion several, one per fused class it is part of, or none when nothing applies it)
+ * @returns {{ rules: import('./render.js').CssRule[], coverage: Map<string, AtomCoverage[]>, classes: number, ruleCount: number, namesOf: (name: string) => string[] }}
+ *   coverage is keyed by `${pe}|${prop}` and holds the classes under the names they are compiled with: namesOf gives
+ *   the names an element really carries for one of them
  */
 export function compileAtoms(atoms, naming, options = {}) {
   const byRule = naming.granularity === 'rule';
@@ -60,7 +62,7 @@ export function compileAtoms(atoms, naming, options = {}) {
 
   for (const atom of sorted) {
     const { className, entry } = atom;
-    const named = byRule ? entryRules(entry, naming) : null;
+    const named = byRule ? cachedEntryRules(entry, naming) : null;
     let branches;
     let rules;
     let gaps = [];
@@ -69,7 +71,7 @@ export function compileAtoms(atoms, naming, options = {}) {
       branches = [{ conj: [], value: entry.tree, path: entry.path }];
       rules = [{ term: [], value: entry.tree }];
     } else {
-      const compiled = named?.compiled ?? compileTree(entry.tree, entry.path);
+      const compiled = named?.compiled ?? compileTreeOnce(entry.tree, entry.path);
       ({ branches, rules } = compiled);
       const overlap = findOverlap(branches, rules);
       if (overlap) {
@@ -144,10 +146,46 @@ export function compileAtoms(atoms, naming, options = {}) {
     return (ka === '' ? 0 : 1) - (kb === '' ? 0 : 1) || cmp(ka, kb) || cmp(a.prop, b.prop) || cmp(a.pe, b.pe) || cmp(a.className, b.className);
   });
   // Names are final only now: with minimal names the registry ranks every class by use before it gives a name.
-  const rename = options.finalize ? options.finalize(uses) : (name) => name;
-  for (const item of items) item.rule.selectors = item.parts.map(([name, rest]) => `.${rename(name)}${rest}`);
-  const ruleCount = items.length;
-  return { rules: options.group ? groupRules(items) : items.map((i) => i.rule), coverage, classes: classes.size, ruleCount, rename };
+  if (!options.finalize) {
+    for (const item of items) item.rule.selectors = item.parts.map(([name, rest]) => `.${name}${rest}`);
+    return { rules: options.group ? groupRules(items) : items.map((i) => i.rule), coverage, classes: classes.size, ruleCount: items.length, namesOf: (name) => [name] };
+  }
+  const namesOf = options.finalize(uses);
+  const written = new Set();
+  const live = [];
+  for (const item of items) {
+    item.rule.selectors = item.parts.flatMap(([name, rest]) => namesOf(name).map((n) => `.${n}${rest}`));
+    // A rule no element can match (a style of a compiled module that nothing applies) is not written.
+    if (item.rule.selectors.length === 0) continue;
+    live.push(item);
+    for (const [name] of item.parts) for (const n of namesOf(name)) written.add(n);
+  }
+  for (const marker of markers.keys()) for (const n of namesOf(marker)) written.add(n);
+  const fused = live.length !== items.length || live.some((item) => item.rule.selectors.length !== item.parts.length) || written.size !== classes.size;
+  let rules = options.group || fused ? groupRules(live) : live.map((i) => i.rule);
+  if (fused) rules = mergeSelectors(rules);
+  return { rules, coverage, classes: written.size, ruleCount: live.length, namesOf };
+}
+
+/**
+ * Rules with the same selectors in the same at-rule context become one rule with every declaration (a fused class
+ * carries several). Atom rules for one property never match the same element together, so their order decides nothing.
+ */
+function mergeSelectors(rules) {
+  const out = [];
+  const seen = new Map();
+  for (const rule of rules) {
+    const key = `${rule.atRules.join('\n')}\u0000${rule.selectors.join(',')}`;
+    const known = seen.get(key);
+    if (known) known.decls.push(...rule.decls);
+    else {
+      const copy = { ...rule, decls: [...rule.decls] };
+      seen.set(key, copy);
+      out.push(copy);
+    }
+  }
+  for (const rule of out) if (rule.decls.length > 1) rule.decls.sort((a, b) => cmp(a[0], b[0]));
+  return out;
 }
 
 /**

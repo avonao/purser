@@ -25,7 +25,14 @@ export class PurserWebpackPlugin {
     const production = compiler.options.mode === 'production';
     const options = { ...this.options, projectDir };
     if (options.names === 'min' && !options.namesFile) options.namesFile = 'node_modules/.cache/purser/names.json';
-    const core = createPluginCore({ ...options, compile: false }, { projectDir, minify: production });
+    // Fused classes need a build that compiles every module once: a production build that does not watch.
+    const oneShot = production && !compiler.options.watch;
+    const core = createPluginCore({ ...options, compile: false }, { projectDir, minify: production, oneShot });
+    if (core.fuse) {
+      compiler.hooks.watchRun.tap('purser', () => {
+        throw new Error('purser: fuse cannot be used with a watching build (a fused class depends on every module); remove it or build once');
+      });
+    }
     const run = async (compilation) => {
       const result = await core.buildStylesheet();
       if (!result) return;
@@ -42,7 +49,8 @@ export class PurserWebpackPlugin {
       compilation.hooks.finishModules.tapPromise('purser', () => run(compilation));
     });
     if (options.compile === false) return;
-    const { src: _src, out: _out, minify: _minify, layers: _layers, compile: _compile, ...loaderOptions } = options;
+    // The loader takes the names, fused or not, from the names file this plugin's build keeps.
+    const { src: _src, out: _out, minify: _minify, layers: _layers, compile: _compile, fuse: _fuse, ...loaderOptions } = options;
     compiler.options.module.rules.unshift({
       test: /\.[cm]?[jt]sx?$/,
       exclude: /node_modules/,

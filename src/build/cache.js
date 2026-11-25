@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const FORMAT = 1;
+const FORMAT = 2;
 
 export const hashText = (text) => crypto.createHash('sha1').update(text).digest('base64url').slice(0, 22);
 
@@ -37,15 +37,19 @@ export function openCache({ dir, key }) {
   }
   const seen = new Set();
   return {
-    /** @returns {any[] | null} the cached calls of a file */
-    get(rel, hash) {
+    /**
+     * @param {boolean} [needModule] only an entry that also has what the module compiles to counts
+     * @returns {{ c: any[], m?: object | null } | null} the cached calls of a file (c) and, when the build that stored
+     *   it compiled modules, what the module compiles to (m)
+     */
+    get(rel, hash, needModule = false) {
       const entry = data.files[rel];
-      if (!entry || entry.h !== hash) return null;
+      if (!entry || entry.h !== hash || (needModule && entry.m === undefined)) return null;
       seen.add(rel);
-      return entry.c;
+      return entry;
     },
-    set(rel, hash, calls) {
-      data.files[rel] = { h: hash, c: calls };
+    set(rel, hash, calls, module) {
+      data.files[rel] = module === undefined ? { h: hash, c: calls } : { h: hash, c: calls, m: module };
       seen.add(rel);
       dirty = true;
     },

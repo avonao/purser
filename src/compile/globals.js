@@ -59,9 +59,11 @@ const classLit = (className, neg) => ({ kind: 'class', text: className, neg });
 /**
  * @param {{ def: Record<string, unknown>, origin: unknown }[]} calls in authoring order
  * @param {Map<string, import('./atoms.js').AtomCoverage[]>} coverage
+ * @param {(name: string) => string[]} [namesOf]  the names an element carries for an atom class (several when fused
+ *   classes include it, none when nothing applies it)
  * @returns {{ rules: import('./render.js').CssRule[], fontFaces: [string, string][][], items: object[] }}
  */
-export function compileGlobals(calls, coverage, rename = (name) => name) {
+export function compileGlobals(calls, coverage, namesOf = (name) => [name]) {
   const items = [];
   const fontFaces = [];
   calls.forEach((call, callIndex) => {
@@ -139,7 +141,7 @@ export function compileGlobals(calls, coverage, rename = (name) => name) {
         for (const term of mergeTerms(terms)) {
           const base = and(term, noClass);
           ruleTerms.push({ term: base, value });
-          emitted.push({ item, rule: renderGlobal(item, base, value, rename) });
+          emitted.push({ item, rule: renderGlobal(item, base, value, namesOf) });
           // (a null rule is unsatisfiable by tag names; the verifier still sees its term)
           for (const c of cov) {
             if (c.className === null) continue; // no gap: nothing for a global rule to fill
@@ -148,7 +150,7 @@ export function compileGlobals(calls, coverage, rename = (name) => name) {
               const t = withClass && and(withClass, gap);
               if (!t) continue;
               ruleTerms.push({ term: t, value });
-              emitted.push({ item, rule: renderGlobal(item, t, value, rename) });
+              emitted.push({ item, rule: renderGlobal(item, t, value, namesOf) });
             }
           }
         }
@@ -219,7 +221,7 @@ function decidedByTag(subject, other) {
 }
 
 /** Render one global rule: subject + other literals + class exclusions + pseudo-element. Null when dead. */
-function renderGlobal(item, term, value, rename = (name) => name) {
+function renderGlobal(item, term, value, namesOf = (name) => [name]) {
   const { selector, atRules } = renderTerm(term);
   let suffix = '';
   const excluded = [];
@@ -237,8 +239,12 @@ function renderGlobal(item, term, value, rename = (name) => name) {
       }
       suffix += l.neg ? `:not(${l.text})` : `:is(${l.text})`;
     } else if (l.kind === 'class') {
-      if (l.neg) excluded.push(`.${rename(l.text)}`);
-      else suffix += `.${rename(l.text)}`;
+      // An element has the atom class when it carries any of the names it is written under.
+      const names = namesOf(l.text);
+      if (l.neg) {
+        for (const n of names) if (!excluded.includes(`.${n}`)) excluded.push(`.${n}`);
+      } else if (names.length === 0) return null; // nothing applies the class: the rule matches no element
+      else suffix += names.length === 1 ? `.${names[0]}` : `:is(${names.map((n) => `.${n}`).join(', ')})`;
     } else suffix += l.neg ? `:not(${l.text})` : l.text;
   }
   if (excluded.length) suffix += `:not(${excluded.join(', ')})`;

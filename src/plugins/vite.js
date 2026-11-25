@@ -23,9 +23,11 @@ export function purser(options = {}) {
   let core = null;
   let root = options.projectDir;
   let production = false;
+  // Fused classes need a build that compiles every module once: not a dev server, not a watching build.
+  let oneShot = true;
   let timer = null;
   let warn = (message) => console.warn(message);
-  const ready = () => (core ??= createPluginCore(options, { projectDir: root, minify: production }));
+  const ready = () => (core ??= createPluginCore(options, { projectDir: root, minify: production, oneShot }));
 
   async function writeStylesheet(fail) {
     const result = await ready().buildStylesheet();
@@ -58,9 +60,11 @@ export function purser(options = {}) {
     configResolved(config) {
       root ??= config.root;
       production = config.command === 'build' && config.mode !== 'development';
+      oneShot = config.command === 'build' && !config.build?.watch;
       warn = (message) => config.logger.warn(message);
     },
     async buildStart() {
+      if (this.meta?.watchMode) oneShot = false; // Rollup's watch mode
       await writeStylesheet((message) => this.error(message));
     },
     async transform(code, id) {

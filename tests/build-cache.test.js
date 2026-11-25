@@ -113,6 +113,14 @@ test('worker threads give the same stylesheet as one thread', { skip }, async ()
   assert.deepEqual(b.diagnostics, []);
   assert.equal(b.css, a.css);
   assert.equal(b.stats.atoms, a.stats.atoms);
+  // what the modules compile to comes back from the threads too: a fused stylesheet is planned from it
+  const fused = { projectDir: dir, src: ['src'], tokens: 'tokens.ts', cache: false, names: 'min', granularity: 'rule', minify: true, fuse: 'exact' };
+  const fa = await build({ ...fused, threads: 0 });
+  const fb = await build({ ...fused, threads: 3 });
+  assert.deepEqual(fb.diagnostics, []);
+  assert.equal(fb.css, fa.css);
+  assert.deepEqual(fb.stats, fa.stats);
+  assert.ok(fa.stats.fused.classes < fa.stats.fused.ids);
 });
 
 test('a tokens module of literals and const bindings is read without running it', { skip }, async () => {

@@ -32,6 +32,17 @@ const emitPurserProject = (spec, dir) => {
 const purserArgs = (dir, ...more) => [purserBin, 'build', '--project', dir, '--src', 'components,lib', '--tokens', 'lib/tokens.ts', '--out', 'out.css', ...more];
 
 export const TOOLS = [
+  ...['exact', 'balanced', 'max'].map((level) => ({
+    id: `purser-${level}`,
+    label: `Purser (compiled, fuse: ${level})`,
+    note: `rule granularity, minified stylesheet, names given by the build, classes fused (${level})`,
+    emit: emitPurserProject,
+    build: (dir) => ({ cmd: process.execPath, args: purserArgs(dir, '--granularity', 'rule', '--minify', '--names', 'min', '--fuse', level), css: 'out.css' }),
+    clean: coldPurser,
+    plugins: async (dir) => [
+      (await import('@avonao/purser/esbuild')).purserEsbuild({ projectDir: dir, tokens: 'lib/tokens.ts', src: ['components', 'lib'], out: 'out.css', minify: true, granularity: 'rule', names: 'min', fuse: level }),
+    ],
+  })),
   {
     id: 'purser-min',
     label: 'Purser (compiled, minimal names)',

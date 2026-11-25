@@ -6,9 +6,13 @@ import path from 'node:path';
 import { parentPort, workerData } from 'node:worker_threads';
 import { hashText } from './cache.js';
 import { extractFile } from './extract.js';
+import { analyzeModule } from '../compiler/transform.js';
+import { memoizedClassNames, normalizeNamedStyle } from './memo.js';
+import { makeCreateCss } from '../runtime.js';
 import { compilerOptions, loadTypeScript, real } from './host.js';
 
-const { projectDir, packageName, naming, tokensReal, tokensExports, cssModuleReal, files } = workerData;
+// identity: the naming class ids are computed with, when the build also wants what every module compiles to
+const { projectDir, packageName, naming, identity, tokensReal, tokensExports, cssModuleReal, files } = workerData;
 
 try {
   const ts = loadTypeScript(projectDir);
@@ -30,11 +34,14 @@ try {
     resolveStatic: (spec, fromFile) => (tokensReal && resolve(spec, fromFile) === tokensReal ? tokensExports : undefined),
     isCssModule: (spec, fromFile) => Boolean(cssModuleReal) && resolve(spec, fromFile) === cssModuleReal,
   };
+  const moduleCtx = identity && { ...ctx, isPure: (spec, fromFile) => Boolean(tokensReal) && resolve(spec, fromFile) === tokensReal, naming: identity, css: makeCreateCss(memoizedClassNames(), normalizeNamedStyle)(identity) };
   const results = [];
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
-    const { calls, diagnostics } = extractFile(file, text, ctx);
-    results.push({ file, hash: hashText(text), diagnostics, calls: calls.map(({ locate: _locate, ...call }) => call) });
+    const found = extractFile(file, text, moduleCtx ? { ...ctx, nodes: true } : ctx);
+    const result = { file, hash: hashText(text), diagnostics: found.diagnostics, calls: found.calls.map(({ locate: _locate, node: _node, ...call }) => call) };
+    if (moduleCtx) result.module = cssModuleReal !== null && real(file) === cssModuleReal ? null : analyzeModule(found, text, file, moduleCtx);
+    results.push(result);
   }
   parentPort.postMessage({ ok: true, results });
 } catch (err) {

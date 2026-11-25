@@ -9,9 +9,11 @@ export { STYLE };
 
 /**
  * @param {(entry: import('./normalize.js').Entry, naming: object) => string} classNames  the class names of one atomic entry
+ * @param {(style: unknown, name: string) => Map<string, import('./normalize.js').Entry>} [normalize]  a build passes one
+ *   that remembers its results; the default normalises every time
  */
-export function makeCreateCss(classNames) {
-  return (options) => build(resolveNaming(options), classNames);
+export function makeCreateCss(classNames, normalize = (style, name) => normalizeStyle(style, [name])) {
+  return (options) => build(resolveNaming(options), classNames, normalize);
 }
 
 /**
@@ -32,7 +34,7 @@ export const createCss = makeCreateCss((entry, naming) => {
   return atomClassName(entry, naming);
 });
 
-function build(naming, classNames) {
+function build(naming, classNames, normalize) {
   /**
    * Compile a map of named styles into class-name maps.
    * @param {Record<string, Record<string, unknown>>} styles
@@ -42,7 +44,7 @@ function build(naming, classNames) {
     const out = {};
     for (const name of Object.keys(styles)) {
       const compiled = {};
-      for (const entry of normalizeStyle(styles[name], [name]).values()) {
+      for (const entry of normalize(styles[name], name).values()) {
         compiled[entry.key] = entry.tree === null ? null : classNames(entry, naming);
       }
       Object.defineProperty(compiled, STYLE, { value: true });

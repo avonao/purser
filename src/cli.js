@@ -24,6 +24,10 @@ Options:
   --granularity <g>  property (default: one class per property of a style) or rule (one class per rule, so styles share
                      the rules they have in common and the stylesheet is smaller); must match createCss({ granularity })
   --minify           write the stylesheet without whitespace and merge rules that write the same declaration
+  --fuse <level>     with --names min: give classes that are applied together one class, so elements carry fewer.
+                     exact: classes that never appear without each other (nothing is written twice); balanced: also
+                     classes that often appear together; max: one class for every group a css.props call applies.
+                     Not with --watch (a fused class depends on every module)
   --no-cache         parse every file again instead of using node_modules/.cache/purser (also PURSER_CACHE=0)
   --find-salt        build only: try salts until the class names have no collision, print the one to use (PURSER_SALT), write nothing
   --package <name>   runtime import specifier (default "@avonao/purser")
@@ -64,6 +68,7 @@ export async function main(argv, io = {}) {
         granularity: { type: 'string' },
         'names-file': { type: 'string' },
         minify: { type: 'boolean', default: false },
+        fuse: { type: 'string' },
         'no-cache': { type: 'boolean', default: false },
         'find-salt': { type: 'boolean', default: false },
         package: { type: 'string' },
@@ -126,6 +131,7 @@ export async function main(argv, io = {}) {
     granularity: v.granularity,
     namesFile: v['names-file'],
     minify: v.minify,
+    fuse: v.fuse,
     cache: v['no-cache'] ? false : undefined,
     packageName: v.package,
     cssModule: v['css-module'],
@@ -143,7 +149,8 @@ export async function main(argv, io = {}) {
       return 1;
     }
     const s = result.stats;
-    const summary = `${s.files} files, ${s.atoms} classes, ${s.rules} rules, ${s.tokens} tokens, ${s.keyframes} keyframes`;
+    let summary = `${s.files} files, ${s.atoms} classes, ${s.rules} rules, ${s.tokens} tokens, ${s.keyframes} keyframes`;
+    if (s.fused) summary += `; fused ${s.fused.level}: ${s.fused.ids} classes as ${s.fused.classes}`;
     if (command === 'check') out(`purser: ok (${summary})\n`);
     else out(`purser: ${result.written ? 'wrote' : 'unchanged'} ${path.relative(cwd, result.outFile)} (${summary})\n`);
     return 0;
@@ -166,6 +173,7 @@ export async function main(argv, io = {}) {
       return 1;
     }
     if (command === 'build' && v.watch) {
+      if (options.fuse) err('purser: --fuse is not used with --watch: every class keeps its own name while watching\n');
       await watch(options, print);
       out('purser: watching for changes (Ctrl+C to stop)\n');
       return new Promise(() => {});

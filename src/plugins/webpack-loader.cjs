@@ -32,7 +32,14 @@ module.exports = function purserLoader(source, inputMap) {
     return;
   }
   compilerFor(options, options.projectDir || this.rootContext || process.cwd())
-    .then((compiler) => (compiler ? compiler.transform(source, this.resourcePath) : null))
+    .then((compiler) => {
+      // With names "min" the result depends on the names the build keeps (and, fused, on its plan): a bundler that
+      // caches compiled modules between builds must compile this one again when they change.
+      if (compiler && compiler.registry && compiler.registry.files && typeof this.addDependency === 'function') {
+        for (const file of compiler.registry.files) this.addDependency(file);
+      }
+      return compiler ? compiler.transform(source, this.resourcePath) : null;
+    })
     .then((result) => {
       // A map from an earlier loader would need composing; Purser runs first (enforce: 'pre'), so there is none to keep.
       if (result) callback(null, result.code, inputMap ? undefined : result.map);

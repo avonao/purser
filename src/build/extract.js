@@ -306,6 +306,9 @@ function createScope(file, text, ctx, always = false) {
   // --- one walk: parent links, and the nodes that can matter, in source order -----------------------------------
   /** Identifiers bound to `css`, property accesses (with a namespace import) and calls. */
   const candidates = [];
+  /** Every identifier of the file (kept for the compiler, which asks where a few names are referred to). */
+  const identifiers = [];
+  const keepIdentifiers = ctx.nodes === true;
   if (always || cssNames.size > 0 || nsNames.size > 0 || tokenFns.size > 0) {
     const K = ts.SyntaxKind;
     const watchAccess = nsNames.size > 0;
@@ -314,6 +317,7 @@ function createScope(file, text, ctx, always = false) {
       node.parent = current;
       const kind = node.kind;
       if (kind === K.Identifier) {
+        if (keepIdentifiers) identifiers.push(node);
         if (cssNames.has(node.text)) candidates.push(node);
       } else if (kind === K.CallExpression || (watchAccess && kind === K.PropertyAccessExpression)) candidates.push(node);
       const saved = current;
@@ -324,7 +328,7 @@ function createScope(file, text, ctx, always = false) {
     ts.forEachChild(sf, step);
   }
 
-  return { ts, sf, pos, cssNames, nsNames, tokenFns, imports, importNodes, positions, state, isCssRef, isTokenFn, lookup, ev, candidates };
+  return { ts, sf, pos, cssNames, nsNames, tokenFns, imports, importNodes, positions, state, isCssRef, isTokenFn, lookup, ev, candidates, identifiers };
 }
 
 /**
